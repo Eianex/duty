@@ -1,0 +1,11 @@
+# DUTY tools, credentials, environments and generated files
+/local/
+
+# Incidental Python/editor files
+__pycache__/
+*.py[cod]
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.psb

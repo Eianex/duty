@@ -1,0 +1,13 @@
+[upload]
+visibility = "public"
+made_for_kids = false
+headless = false
+
+[timeouts]
+login = 600
+element = 45
+upload = 7200
+
+[auth]
+# An age threshold prompts a session check, not an assumption of server expiry.
+max_age_hours = 168

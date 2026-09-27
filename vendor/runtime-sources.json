@@ -1,0 +1,47 @@
+{
+  "python": {
+    "version": "3.11.9",
+    "url": "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip",
+    "sha256": "009d6bf7e3b2ddca3d784fa09f90fe54336d5b60f0e0f305c37f400bf83cfd3b"
+  },
+  "firefox": {
+    "version": "152.0.5",
+    "url": "https://archive.mozilla.org/pub/firefox/releases/152.0.5/win64/en-US/Firefox%20Setup%20152.0.5.exe",
+    "sha256": "6fe5df6fd8abf6b9a4de021c904ffd03cbf09ddc41aea6d4aaf333ee39ec3373"
+  },
+  "geckodriver": {
+    "version": "0.37.1",
+    "url": "https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-win64.zip",
+    "sha256": "dfed9315abe8d2fbc1b6161a2ee8002452e79cf05ee92fdc653a4e26bc35edd8"
+  },
+  "deno": {
+    "version": "2.8.3",
+    "url": "https://github.com/denoland/deno/releases/download/v2.8.3/deno-x86_64-pc-windows-msvc.zip",
+    "sha256": "7fdd1f42e6b0855421ecf27bb406e2492ade1087c85e30ebf0deab6280ea743c"
+  },
+  "ffmpeg": {
+    "version": "N-126798-g4a511dc8eb",
+    "url": "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/autobuild-2026-09-23-20-23/ffmpeg-N-126798-g4a511dc8eb-win64-gpl.zip",
+    "sha256": "15d95870f3672c57d4450390f43c58a2fdf0b3a77289a6f5159f1910ac5fda69"
+  },
+  "7zr": {
+    "version": "bootstrap",
+    "url": "https://www.7-zip.org/a/7zr.exe",
+    "sha256": "ad4c82fadcbdf93c03b4fc440f300509c7d60c5c2f4d183e35d9d70d6957037d"
+  },
+  "node_build": {
+    "version": "22.14.0",
+    "url": "https://nodejs.org/dist/v22.14.0/node-v22.14.0-win-x64.zip",
+    "sha256": "55b639295920b219bb2acbcfa00f90393a2789095b7323f79475c9f34795f217"
+  },
+  "geckodriver_license": {
+    "version": "0.37.1",
+    "url": "https://raw.githubusercontent.com/mozilla/geckodriver/v0.37.1/LICENSE",
+    "sha256": "ceddacc7e73488493af8e3b48aa450e25e9f2066b344a5bfa8b32a7c3a4b9ba3"
+  },
+  "deno_license": {
+    "version": "2.8.3",
+    "url": "https://raw.githubusercontent.com/denoland/deno/v2.8.3/LICENSE.md",
+    "sha256": "f62497fffecc0852960c8d3e6934b9db86d16396e9b604072e923892cae3a588"
+  }
+}
