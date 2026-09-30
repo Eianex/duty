@@ -55,6 +55,15 @@ as its working directory. It uses no command shell, stored personal paths or
 script associations. Missing files and process-start errors use message boxes.
 It exits after starting Python; normal users do not need a compiler.
 
+Before starting the GUI, the launcher runs the hidden `setup --check` with local
+Python. This check is offline and ignores login. If local Python is missing or the
+check fails, it finds an external Windows x64 Python 3.11+ with pip 22.3+ through
+`py -0p` and PATH, skipping the portable interpreter. It then runs `setup
+--launcher-progress` hidden inside a WinForms progress window, checks again and
+starts the GUI. Output is appended to `local/logs/launcher-setup.log`. Without a
+suitable interpreter or after a failure, the window shows the error and does not
+start the GUI.
+
 To rebuild from the project root using the Windows .NET Framework compiler:
 
 ```powershell

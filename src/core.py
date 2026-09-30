@@ -254,6 +254,42 @@ def dependency_versions(config):
     return missing
 
 
+def _provider_installed(config):
+    server = config.path("provider/server")
+    manifest = config.path("vendor/bgutil/server/package.json")
+    if not manifest.is_file() or not (server / "src/generate_once.ts").is_file():
+        return False
+    dependencies = json.loads(manifest.read_text(encoding="utf-8")).get("dependencies", {})
+    return bool(dependencies) and all(
+        (server / "node_modules" / name / "package.json").is_file()
+        for name in dependencies
+    )
+
+
+def setup_ready(config):
+    """Local installer readiness; never checks authentication or the network."""
+    missing = []
+    python = config.tool("python")
+    if (os.name != "nt" or sys.implementation.name != "cpython"
+            or sys.version_info[:3] != (3, 11, 9)
+            or sysconfig.get_platform() != "win-amd64"
+            or Path(sys.executable).resolve() != python.resolve()):
+        missing.append("portable CPython 3.11.9 Windows x64")
+    for path in (python, python.with_name("pythonw.exe"),
+                 config.path("runtime/python/python311.zip"),
+                 config.path("runtime/python/python311._pth")):
+        if not path.is_file():
+            missing.append(str(path))
+    for name in ("firefox", "geckodriver", "deno", "ffmpeg", "ffprobe"):
+        if not config.tool(name).is_file():
+            missing.append(str(config.tool(name)))
+    missing.extend(dependency_versions(config))
+    if not _provider_installed(config):
+        missing.append("local provider dependencies")
+    return {"ok": not missing, "missing": missing,
+            "message": "Local setup ready" if not missing else "Local setup needs attention"}
+
+
 def status(config, *, online=False, refresh=False):
     """Check components, then saved authentication; Studio is checked only by uploads."""
     checks = []
@@ -311,9 +347,10 @@ def status(config, *, online=False, refresh=False):
     return {"ok": all(row["state"] != "red" for row in latest.values()), "channel_id": channel, "checks": list(latest.values())}
 
 
-def _run_setup(config, *command, **kwargs):
+def _run_setup(config, *command, message="Installing required components…", **kwargs):
     config.check_cancel()
-    config.emit("message", message="Installing required components…")
+    config.emit("message", message=message)
+    kwargs.setdefault("creationflags", getattr(subprocess, "CREATE_NO_WINDOW", 0))
     subprocess.run(list(map(str, command)), check=True, **kwargs)
 
 
@@ -332,16 +369,34 @@ def setup(config):
             config.emit("message", message=f"Downloading {name}")
             partial = path.with_suffix(".partial")
             with urllib.request.urlopen(source["url"], timeout=120) as response, partial.open("wb") as stream:
+                total = response.headers.get("Content-Length")
+                total = int(total) if total and total.isdecimal() else None
+                downloaded = 0
+                last_report = 0.0
                 while chunk := response.read(1024 * 1024):
                     config.check_cancel()
                     stream.write(chunk)
+                    downloaded += len(chunk)
+                    current = time.monotonic()
+                    if current - last_report >= 0.5 or (total and downloaded >= total):
+                        detail = f"Downloading {name}: {downloaded // (1024 * 1024)} MB"
+                        if total:
+                            detail += f" / {total // (1024 * 1024)} MB"
+                        config.emit("message", message=detail)
+                        last_report = current
             partial.replace(path)
         if file_hash(path) != source["sha256"]:
             raise RuntimeError(f"Checksum mismatch for {name}; remove {path} and run setup again")
         return path
     for name in ("python", "firefox", "geckodriver", "deno", "ffmpeg"):
-        if config.tool(name).is_file() and (name != "ffmpeg" or config.tool("ffprobe").is_file()):
+        complete = config.tool(name).is_file()
+        if name == "python":
+            complete = complete and config.tool("python").with_name("pythonw.exe").is_file()
+        if name == "ffmpeg":
+            complete = complete and config.tool("ffprobe").is_file()
+        if complete:
             continue
+        config.emit("message", message=f"Preparing {name}")
         target = config.path("runtime", name)
         if target.exists():
             raise RuntimeError(f"Incomplete component at {target}; move it aside before setup")
@@ -349,7 +404,8 @@ def setup(config):
         payload = stage / "payload"
         payload.mkdir()
         if name == "firefox":
-            _run_setup(config, archive("7zr"), "x", archive("firefox"), "-o" + str(stage / "extracted"), "-y", stdout=subprocess.DEVNULL)
+            _run_setup(config, archive("7zr"), "x", archive("firefox"), "-o" + str(stage / "extracted"), "-y",
+                       message="Extracting Firefox", stdout=subprocess.DEVNULL)
             shutil.copytree(stage / "extracted/core", payload, dirs_exist_ok=True)
             policy = payload / "distribution/policies.json"
             policy.parent.mkdir(exist_ok=True)
@@ -419,13 +475,14 @@ def setup(config):
             # Resolve all pins together, not just missing packages, to keep
             # transitive dependencies consistent with the complete requirements.
             _run_setup(config, *pip_command, "install", "--only-binary=:all:", "--upgrade", "--target", packages,
-                       "--cache-dir", config.path("cache/pip"), "-r", config.path("requirements.txt"))
+                       "--cache-dir", config.path("cache/pip"), "-r", config.path("requirements.txt"),
+                       message="Installing Python packages")
         except subprocess.CalledProcessError as exc:
             raise RuntimeError("Dependency installation failed. Review pip's error above for unavailable Python 3.11 "
                                "Windows x64 wheels, conflicting pins or network errors, then retry setup. "
                                "DUTY does not compile packages or relax its pins.") from exc
     server = config.path("provider/server")
-    if not (server / "node_modules").is_dir():
+    if not _provider_installed(config):
         stage = Path(tempfile.mkdtemp(prefix="provider_", dir=cache))
         staged_server = stage / "server"
         shutil.copytree(config.path("vendor/bgutil/server"), staged_server,
@@ -437,7 +494,7 @@ def setup(config):
         env["PATH"] = str(node.parent) + os.pathsep + env.get("PATH", "")
         env["npm_config_cache"] = str(config.path("cache/npm"))
         _run_setup(config, node, node.parent / "node_modules/npm/bin/npm-cli.js", "ci", "--omit=dev", "--no-audit", "--no-fund",
-                   cwd=staged_server, env=env)
+                   cwd=staged_server, env=env, message="Installing provider packages")
         if server.exists():
             backup = server.with_name("server_previous_" + uuid.uuid4().hex)
             server.rename(backup)

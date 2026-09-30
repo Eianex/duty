@@ -40,24 +40,41 @@ normal browser.
 
    ```bash
    git clone https://github.com/Eianex/duty.git
-   cd duty
    ```
 
-2. Run setup once. It takes a few minutes the first time:
+2. Double-click **`DUTY.exe`** in the project folder.
 
-   ```bash
-   python src/main.py setup
-   ```
+   The first time, DUTY notices it isn't set up yet and does it for you. A small
+   **DUTY setup** window appears and shows what's being downloaded and installed.
+   This takes a few minutes, and when it's done the app opens on its own. From
+   then on, double-clicking `DUTY.exe` opens the app straight away.
 
-3. Double-click **`DUTY.exe`** in the project folder to open the app.
-
-4. The first time you download or upload, DUTY opens Firefox and asks you to sign
+3. The first time you download or upload, DUTY opens Firefox and asks you to sign
    in to Google. Sign in, get through any verification prompts and pick your
    channel. DUTY saves the session, so you won't have to do this again for a while.
 
-Setup is safe to run again, and it's worth doing after you pull a new version
-of DUTY. It only installs what's missing, and your login and history stay as
-they are.
+When you pull a new version of DUTY, just open `DUTY.exe` as usual. If the update
+needs anything new, the setup window shows up again and installs only what's
+missing. Your login and history stay as they are.
+
+<details>
+<summary>If setup can't find Python or something goes wrong</summary>
+
+The setup window uses the Python you installed, so it has to be able to find it.
+If it can't, it tells you so. Install Python 3.11+ (with "Add python.exe to PATH"
+ticked) and double-click `DUTY.exe` again.
+
+If setup fails partway, the window shows what happened, and the full log is saved
+in `local/logs/launcher-setup.log`. Double-clicking `DUTY.exe` again retries, and
+anything that was already installed is kept.
+
+You can also run setup yourself from a terminal in the project folder:
+
+```bash
+python src/main.py setup
+```
+
+</details>
 
 ## Using the app
 
@@ -224,8 +241,7 @@ DUTY handles one video at a time. It doesn't do playlists, batches, search,
 scheduled uploads, thumbnails, tags, playlist management or editing videos that
 are already on your channel.
 
-> **Heads-up:** the desktop window and some of the newer upload logic haven't been
-> fully tested yet. If something looks off, please open an issue.
+> **Heads-up:** If something looks off, please open an issue.
 
 ## Credits & licenses
 
