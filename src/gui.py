@@ -84,13 +84,17 @@ class Worker(QThread):
                     "a", encoding="utf-8"
                 ) as log, redirect_stdout(log), redirect_stderr(log):
                     if self.action == "check":
-                        result = status(self.config, online=True)
+                        result = status(self.config, online=False)
                     elif self.action == "login":
                         result = status(self.config, online=True, refresh=True)
                     elif self.action == "download":
                         from src.download import download_video
 
                         result = download_video(config=self.config, **self.values)
+                    elif self.action == "convert":
+                        from src.download import convert_video
+
+                        result = convert_video(config=self.config, **self.values)
                     else:
                         from src.upload import run_single_upload
 
@@ -116,6 +120,7 @@ class Window(QMainWindow):
         super().__init__()
         self.config, self.worker = config, None
         self.ready = False
+        self.convert_ready = False
         self.close_pending = False
         self.last_result = {}
         self.studio_completed = False
@@ -130,6 +135,7 @@ class Window(QMainWindow):
         self.tabs = QTabWidget()
         self.tabs.addTab(self.download_page(), "Download")
         self.tabs.addTab(self.upload_page(), "Upload")
+        self.tabs.addTab(self.convert_page(), "Convert")
         self.tabs.currentChanged.connect(self.change_tab)
         layout.addWidget(self.tabs)
 
@@ -197,7 +203,7 @@ class Window(QMainWindow):
             health_layout.addLayout(column, 1)
         layout.addWidget(health_box)
         actions = QHBoxLayout()
-        self.check_button = QPushButton("Check connection")
+        self.check_button = QPushButton("Check status")
         self.login_button = QPushButton("Refresh login")
         self.check_button.clicked.connect(lambda: self.start("check"))
         self.login_button.clicked.connect(lambda: self.start("login"))
@@ -208,9 +214,10 @@ class Window(QMainWindow):
 
     def change_tab(self, index):
         self.go.setText(self.tabs.tabText(index))
+        self.go.setEnabled(self.worker is None and (self.convert_ready if index == 2 else self.ready))
         self.health["studio"][0].setVisible(index == 1 and self.studio_completed)
 
-    def picker(self, field, folder=False):
+    def picker(self, field, folder=False, file_filter="Videos (*.mp4 *.mkv)"):
         widget = QWidget()
         row = QHBoxLayout(widget)
         row.setContentsMargins(0, 0, 0, 0)
@@ -222,7 +229,7 @@ class Window(QMainWindow):
                 QFileDialog.getExistingDirectory(self, "Destination", field.text())
                 if folder
                 else QFileDialog.getOpenFileName(
-                    self, "Video", field.text(), "Videos (*.mp4 *.mkv)"
+                    self, "Video", field.text(), file_filter
                 )[0]
             )
             if value:
@@ -321,6 +328,17 @@ class Window(QMainWindow):
         form.addRow(self.visibility_note)
         return page
 
+    def convert_page(self):
+        page = QWidget()
+        form = QFormLayout(page)
+        self.convert_file = QLineEdit()
+        self.convert_file.setPlaceholderText("Choose a local MP4 video")
+        form.addRow("MP4 video", self.picker(self.convert_file, file_filter="MP4 videos (*.mp4)"))
+        note = QLabel("Saves an MP3 beside the original MP4 with the same filename. The MP4 stays untouched.")
+        note.setWordWrap(True)
+        form.addRow(note)
+        return page
+
     def transfer(self):
         if self.tabs.currentIndex() == 0:
             if not self.url.text().strip():
@@ -334,7 +352,7 @@ class Window(QMainWindow):
                 "exact_4k_only": self.mp4_button.isChecked() and self.quality.currentIndex() == 2,
             }
             self.start("download", values)
-        else:
+        elif self.tabs.currentIndex() == 1:
             if not self.video.text().strip():
                 self.message.setText("Choose a video file first.")
                 return
@@ -348,6 +366,11 @@ class Window(QMainWindow):
                     "made_for_kids": self.audience.isChecked(),
                 },
             )
+        else:
+            if not self.convert_file.text().strip():
+                self.message.setText("Choose an MP4 file first.")
+                return
+            self.start("convert", {"source": self.convert_file.text().strip()})
 
     def start(self, action, values=None):
         if self.worker is not None:
@@ -364,8 +387,8 @@ class Window(QMainWindow):
         self.cancel_button.setEnabled(True)
         self.progress.setRange(0, 0)
         self.message.setText(
-            "Checking connection…"
-            if action in {"check", "login"}
+            "Checking setup…" if action == "check"
+            else "Refreshing login…" if action == "login"
             else f"Starting {action}…"
         )
         self.worker = Worker(self.config, action, values or {})
@@ -405,15 +428,21 @@ class Window(QMainWindow):
     def on_result(self, result):
         self.last_result = result
         if self.last_action in {"check", "login"}:
-            self.ready = bool(result.get("ok"))
-            self.message.setText(
-                result.get("error")
-                or (
-                    "Ready."
-                    if self.ready
-                    else "Setup needs attention. See the status below; run setup for missing components."
-                )
-            )
+            if "checks" in result:
+                checks = {row["name"]: row["state"] for row in result["checks"]}
+                self.ready = all(checks.get(name) == "green" for name in self.installed_keys)
+                self.convert_ready = all(checks.get(name) == "green" for name in ("ffmpeg", "ffprobe"))
+            if result.get("error"):
+                message = result["error"]
+            elif result.get("ok"):
+                message = "Ready."
+            elif self.ready:
+                message = "Tools ready. YouTube login will open when needed."
+            elif self.convert_ready:
+                message = "Convert is ready. Other tools need attention; see the status below."
+            else:
+                message = "Setup needs attention. See the status below; run setup for missing components."
+            self.message.setText(message)
         else:
             outcome = result.get("status", "failed")
             message = result.get("error") or outcome.capitalize()
@@ -426,12 +455,13 @@ class Window(QMainWindow):
                 message += "\nJob: " + result["job_id"]
             if result.get("youtube_url"):
                 message += "\n" + result["youtube_url"]
+            if self.last_action == "convert" and result.get("local_path"):
+                message += "\nSaved: " + result["local_path"]
             if result.get("warnings"):
                 message += "\n" + "\n".join(result["warnings"])
             self.message.setText(message)
-            code = result.get("error_code")
             reused = result.get("stage") in {"cached_output", "duplicate"}
-            if not result.get("ok") and outcome != "cancelled":
+            if self.last_action in {"download", "upload"} and not result.get("ok") and outcome != "cancelled":
                 self.on_event(
                     {
                         "kind": "health",
@@ -452,8 +482,6 @@ class Window(QMainWindow):
                         "checked_at": now(),
                     }
                 )
-            if code in {"login_required", "authentication", "channel_mismatch"}:
-                self.ready = False
         self.progress.setRange(0, 100)
         self.progress.setValue(100 if result.get("ok") else 0)
 
@@ -463,7 +491,7 @@ class Window(QMainWindow):
         self.tabs.setEnabled(True)
         for widget in (self.check_button, self.login_button):
             widget.setEnabled(True)
-        self.go.setEnabled(self.ready)
+        self.go.setEnabled(self.convert_ready if self.tabs.currentIndex() == 2 else self.ready)
         self.cancel_button.setEnabled(False)
         self.open_button.setEnabled(
             bool(
@@ -477,9 +505,9 @@ class Window(QMainWindow):
     def cancel(self):
         self.config.cancel_event.set()
         self.cancel_button.setEnabled(False)
-        self.message.setText(
-            "Cancelling safely… an attached upload will not be submitted again."
-        )
+        self.message.setText("Cancelling safely…" +
+                             (" an attached upload will not be submitted again."
+                              if self.last_action == "upload" else ""))
 
     def open_result(self):
         if self.last_result.get("youtube_url") and self.last_action == "upload":

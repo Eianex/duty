@@ -5,7 +5,7 @@ Use a desktop window or Python commands. No API key, AI assistant or hosted serv
 
 ## First setup
 
-A source clone does not include installed tools. Install **Python 3.11 x64 with pip** once, then run from this folder:
+A source clone does not include installed tools. Install **Windows x64 Python 3.11+ with pip** once, then run from this folder:
 
 ```text
 python src/main.py setup
@@ -44,17 +44,21 @@ Or launch through Python:
 python src/gui.py
 ```
 
-The window checks the tools and saved session, and opens ordinary Firefox if login
-is needed. Sign in, complete any Google challenge and select your channel.
+The window checks the tools and saved session locally on startup. Download and
+Upload open ordinary Firefox if login is needed. Sign in, complete any Google
+challenge and select your channel.
 DUTY captures cookies automatically. Refresh login is available in the window.
 Checks run in order: installed components and provider, account/channel, saved
 cookies. Studio is verified only when starting an upload; its status appears after
 the upload succeeds. Transfer errors appear only if a transfer needs attention.
 
-Select **Download**, paste a YouTube URL and choose a destination; or select
-**Upload**, choose an MP4/MKV and enter its title, description, visibility and audience.
+Select **Download**, paste a YouTube URL and choose a destination; select
+**Upload**, choose an MP4/MKV and enter its title, description, visibility and audience;
+or select **Convert** and choose a local MP4 to save an MP3 beside it.
 The Download tab has two exclusive buttons: **MP4** (selected by default, video
 with audio) and **MP3** (audio only). Video resolution controls are hidden for MP3.
+Convert uses local FFmpeg and works without YouTube login or internet access.
+The MP4 stays untouched, and the Convert tab will not replace an existing MP3.
 Uploads default to **public** and **not made for kids**. The window displays visibility explicitly.
 
 Green means the named check passed; orange means checking, action needed or not
@@ -74,6 +78,8 @@ python src/main.py download "URL" --format mp4
 python src/main.py download "URL" --format mp3
 python src/main.py download "URL" --exact-1080
 python src/main.py download "URL" --exact-4k
+python src/main.py convert "D:\Videos\clip.mp4"
+python src/main.py convert "D:\Videos\clip.mp4" --overwrite
 python src/main.py upload "D:\Videos\clip.mkv" --title "My video"
 python src/main.py upload "D:\Videos\clip.mp4" --visibility private --description "Description"
 python src/main.py history
@@ -83,6 +89,11 @@ Downloads select the best available video and audio and save MP4 without
 re-encoding. Exact-resolution options are optional and fail if unavailable.
 MP3 downloads select the best available audio and convert it using FFmpeg's
 highest MP3 VBR quality setting. Conversion does not improve the source audio.
+The separate `convert` command extracts the first audio track from an existing local
+MP4 with FFmpeg and writes an adjacent MP3 with the same filename stem. It does
+not require a YouTube session. An existing MP3 is protected unless `--overwrite`
+is specified. Local conversions do not create YouTube transfer history records.
+
 The default output directory is `local/downloads/`. Repeating identical download
 options resumes matching partial files or reuses a verified completed file.
 
@@ -119,12 +130,16 @@ Put a script in the repository root, or include the root in its Python import pa
 ```python
 from src.core import Config
 from src.download import download_video
+from src.download import convert_video
 from src.upload import upload_video  # run_single_upload remains an alias
 
 config = Config()
 config.non_interactive = True
 result = download_video("https://www.youtube.com/watch?v=VIDEO_ID", config=config)
 print(result.to_dict())
+
+# Convert a local file without accessing YouTube:
+# result = convert_video("clip.mp4", config=config)
 
 # Upload only when intended:
 # result = upload_video("clip.mkv", config=config, title="My video", visibility="private")

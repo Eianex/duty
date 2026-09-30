@@ -107,6 +107,14 @@ MP4 and exact 1080p/2160p are explicit options. Validate actual output streams;
 resolve only yt-dlp-reported outputs. Cross-drive finalization preserves originals
 until copy verification succeeds. Filename collisions never overwrite existing files.
 
+The Convert tab and `convert` CLI command extract the first audio track of a local
+MP4 into an adjacent MP3 using local FFmpeg and ffprobe. Conversion reuses the
+operation lock and progress/cancellation interface but needs no cookies, provider,
+Firefox or network. The GUI's initial status check is local; download/upload
+authentication begins when a YouTube transfer needs it. Existing MP3s are kept
+unless the CLI explicitly requests `--overwrite`. Conversion has no YouTube
+transfer history record.
+
 Upload defaults: public, not made for kids, visible Firefox, local MP4/MKV input.
 Metadata is optional; explicit fields override metadata and then settings. Invalid
 input fails before launching Firefox. Journal attachment before file submission.

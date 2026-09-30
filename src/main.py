@@ -16,7 +16,7 @@ from src.core import Config, History, Result, Cancelled, LoginRequired, error_co
 
 
 def parser():
-    cli = argparse.ArgumentParser(description="DUTY — download and upload YouTube videos")
+    cli = argparse.ArgumentParser(description="DUTY — download, upload and convert videos")
     cli.add_argument("--json", action="store_true", help="Machine-readable output; progress goes to stderr")
     cli.add_argument("--non-interactive", action="store_true", help="Return login_required instead of opening login")
     sub = cli.add_subparsers(dest="command", required=True)
@@ -33,6 +33,9 @@ def parser():
     quality = download.add_mutually_exclusive_group()
     quality.add_argument("--exact-1080", action="store_true")
     quality.add_argument("--exact-4k", action="store_true")
+    convert = sub.add_parser("convert", help="Extract an MP4's first audio track to an adjacent MP3")
+    convert.add_argument("video", type=Path)
+    convert.add_argument("--overwrite", action="store_true", help="Replace an existing MP3")
     upload = sub.add_parser("upload", help="Upload one local MP4/MKV; defaults to public")
     upload.add_argument("video", type=Path)
     upload.add_argument("--metadata", type=Path)
@@ -86,6 +89,9 @@ def dispatch(args, config):
         from src.download import download_video
         return download_video(args.url, args.output, args.format, args.exact_4k,
                               config=config, exact_1080_only=args.exact_1080)
+    if args.command == "convert":
+        from src.download import convert_video
+        return convert_video(args.video, overwrite=args.overwrite, config=config)
     if args.command == "upload":
         from src.upload import run_single_upload
         return run_single_upload(args.video, args.metadata, config=config, title=args.title,

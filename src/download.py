@@ -5,6 +5,7 @@ from pathlib import Path
 import hashlib
 import importlib
 import json
+import math
 import re
 import sys
 import subprocess
@@ -154,6 +155,115 @@ def validate_output(config, path, container, exact_4k_only=False, *, exact_1080_
     if requested_height and not any(s.get("codec_type") == "video" and s.get("height") == requested_height for s in streams):
         raise RuntimeError(f"Output did not meet the requested exact {requested_height}p height")
     return payload
+
+
+def _audio_duration(payload):
+    audio = next((stream for stream in payload.get("streams", [])
+                  if stream.get("codec_type") == "audio"), None)
+    if audio is None:
+        raise ValueError("Input MP4 has no audio track")
+    for value in (audio.get("duration"), payload.get("format", {}).get("duration")):
+        try:
+            duration = float(value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(duration) and duration > 0:
+            return duration
+    return None
+
+
+def _encode_mp3(config, source, temporary, duration):
+    seconds, speed = 0.0, ""
+    with tempfile.TemporaryFile() as errors:
+        process = subprocess.Popen(
+            [str(config.tool("ffmpeg")), "-hide_banner", "-loglevel", "error", "-nostdin",
+             "-y", "-nostats", "-stats_period", "0.2", "-progress", "pipe:1",
+             "-i", str(source), "-map", "0:a:0", "-vn", "-c:a", "libmp3lame",
+             "-q:a", "2", str(temporary)],
+            stdout=subprocess.PIPE, stderr=errors, text=True, encoding="utf-8",
+            errors="replace", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        try:
+            for line in process.stdout:
+                config.check_cancel()
+                key, _, value = line.strip().partition("=")
+                if key == "out_time_us":
+                    try:
+                        seconds = max(0.0, int(value) / 1000000)
+                    except ValueError:
+                        pass
+                elif key == "speed":
+                    speed = value
+                elif key == "progress":
+                    percent = min(99, int(seconds * 100 / duration)) if duration else None
+                    detail = f" {percent}%" if percent is not None else f" {seconds:.1f}s"
+                    message = f"Converting audio…{detail}" + (f" ({speed})" if speed and speed != "N/A" else "")
+                    config.emit("progress", downloaded=seconds, total=duration, message=message)
+                    if not config.on_event:
+                        print("\r" + message, end="", flush=True)
+            returncode = process.wait()
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+            process.stdout.close()
+            if not config.on_event:
+                print(flush=True)
+        if returncode:
+            errors.seek(0)
+            detail = errors.read().decode("utf-8", errors="replace").strip()
+            raise RuntimeError(f"FFmpeg failed: {detail or f'exit code {returncode}'}")
+
+
+@transfer
+def convert_video(source: str | Path, *, overwrite: bool = False, config=None) -> Result:
+    """Extract the first audio track of a local MP4 to an adjacent MP3."""
+    config = config or Config()
+    source = Path(source).expanduser().resolve()
+    output = source.with_suffix(".mp3")
+    temporary = None
+    try:
+        if not source.is_file():
+            raise ValueError(f"Input is not a local file: {source}")
+        if source.suffix.lower() != ".mp4":
+            raise ValueError("Input must be an MP4 file")
+        for name in ("ffmpeg", "ffprobe"):
+            if not config.tool(name).is_file():
+                raise FileNotFoundError(f"Missing {name}: run python src/main.py setup")
+        if output.exists():
+            if not output.is_file():
+                raise ValueError(f"Output path is not a file: {output}")
+            if not overwrite:
+                raise ValueError(f"Output already exists: {output}. Use --overwrite in the CLI to replace it")
+        duration = _audio_duration(probe(config, source, require_video=False))
+        config.check_cancel()
+        with tempfile.NamedTemporaryFile(dir=source.parent, prefix=f".{source.stem}.",
+                                         suffix=".mp3", delete=False) as handle:
+            temporary = Path(handle.name)
+        _encode_mp3(config, source, temporary, duration)
+        config.check_cancel()
+        validate_output(config, temporary, "mp3")
+        config.check_cancel()
+        if overwrite:
+            os.replace(temporary, output)
+        else:
+            # Windows rename refuses an existing destination and also works on drives
+            # that cannot create hard links, such as removable media.
+            os.rename(temporary, output)
+        config.emit("progress", downloaded=1, total=1, message=f"Saved: {output}")
+        return Result("convert", "completed", local_path=str(output), source=str(source))
+    except (Exception, KeyboardInterrupt) as exc:
+        if isinstance(exc, KeyboardInterrupt):
+            exc = Cancelled("Conversion cancelled")
+        return Result("convert", "cancelled" if isinstance(exc, Cancelled) else "failed",
+                      source=str(source), error=str(exc), error_code=error_code(exc))
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def validate_url(url):
