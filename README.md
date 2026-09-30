@@ -1,217 +1,239 @@
-# DUTY — Download & Upload To YouTube
+<p align="center">
+  <img src="img/duty_logo.png" alt="DUTY logo" width="160">
+</p>
 
-A small Windows Python application for one YouTube account and channel.
-Use a desktop window or Python commands. No API key, AI assistant or hosted service is required.
+<h3 align="center">Download & Upload To YouTube</h3>
 
-## First setup
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" alt="Python 3.11+">
+  <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6" alt="Windows 10/11">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license">
+</p>
 
-A source clone does not include installed tools. Install **Windows x64 Python 3.11+ with pip** once, then run from this folder:
+DUTY is a small Windows app that does three things: it **downloads** YouTube
+videos (as MP4 or MP3), **uploads** your own videos to your channel, and
+**converts** MP4 files you already have into MP3s.
 
-```text
-python src/main.py setup
-```
+You can use it through a simple desktop window, or automate it from the command
+line if you'd rather script things. There are no API keys to set up and no
+third-party services involved. It signs in to YouTube through a real Firefox
+window, just like you would.
 
-Setup prepares portable Python **3.11.9**, Firefox, GeckoDriver, Deno, FFmpeg,
-the existing provider and Python dependencies under `local/`. It reuses installed
-components. It does not change global PATH or install a system browser.
+<p align="center">
+  <img src="img/gui-window.png" alt="The DUTY window, open on the Download tab" width="560">
+</p>
 
-After setup, the entry scripts automatically use DUTY's portable Python when
-launched with another Python. You can also invoke it directly:
+## Before you start
 
-```text
-local/runtime/python/python.exe src/gui.py
-```
+You need **Python 3.11 or newer** (64-bit, with pip) to get going. If you don't
+have it, grab it from [python.org](https://www.python.org/downloads/windows/) and
+tick **"Add python.exe to PATH"** in the installer.
 
-The current source refactor adds PySide6. An existing installation needs setup once
-with an installed Python and pip to add this GUI dependency; its other tools are reused.
-No ZIP building is involved.
+That's the only thing you install yourself. DUTY downloads everything else it
+needs (its own portable Python, Firefox, GeckoDriver, FFmpeg, Deno and the Python
+packages) into the project folder. It doesn't touch your system PATH or your
+normal browser.
 
-## Desktop window
+## Getting started
 
-After setup, double-click **DUTY.exe** in the project root. It finds the local
-`pythonw.exe` and `src/gui.py` relative to itself, without a console window.
-Background tools run without console popups; Firefox still opens when needed.
-You can move the entire installation without rebuilding the launcher.
+1. Clone the repo (or download it as a ZIP and extract it):
 
-The small Windows x64 launcher and its C# source are included in the repository.
-It uses .NET Framework 4.x, available on Windows 10/11, and embeds `img/logo.ico`.
-It contains no installation-specific paths. See the
-[launcher build instructions](.agents/docs/project.md#desktop-launcher) to rebuild it.
+   ```bash
+   git clone https://github.com/Eianex/duty.git
+   cd duty
+   ```
 
-Or launch through Python:
+2. Run setup once. It takes a few minutes the first time:
 
-```text
-python src/gui.py
-```
+   ```bash
+   python src/main.py setup
+   ```
 
-The window checks the tools and saved session locally on startup. Download and
-Upload open ordinary Firefox if login is needed. Sign in, complete any Google
-challenge and select your channel.
-DUTY captures cookies automatically. Refresh login is available in the window.
-Checks run in order: installed components and provider, account/channel, saved
-cookies. Studio is verified only when starting an upload; its status appears after
-the upload succeeds. Transfer errors appear only if a transfer needs attention.
+3. Double-click **`DUTY.exe`** in the project folder to open the app.
 
-Select **Download**, paste a YouTube URL and choose a destination; select
-**Upload**, choose an MP4/MKV and enter its title, description, visibility and audience;
-or select **Convert** and choose a local MP4 to save an MP3 beside it.
-The Download tab has two exclusive buttons: **MP4** (selected by default, video
-with audio) and **MP3** (audio only). Video resolution controls are hidden for MP3.
-Convert uses local FFmpeg and works without YouTube login or internet access.
-The MP4 stays untouched, and the Convert tab will not replace an existing MP3.
-Uploads default to **public** and **not made for kids**. The window displays visibility explicitly.
+4. The first time you download or upload, DUTY opens Firefox and asks you to sign
+   in to Google. Sign in, get through any verification prompts and pick your
+   channel. DUTY saves the session, so you won't have to do this again for a while.
 
-Green means the named check passed; orange means checking, action needed or not
-yet verified; red means failure. Tool readiness is not a guarantee against future
-YouTube bot checks. One transfer runs at a time.
+Setup is safe to run again, and it's worth doing after you pull a new version
+of DUTY. It only installs what's missing, and your login and history stay as
+they are.
 
-## Python CLI
+## Using the app
 
-```text
-python src/main.py login
-python src/main.py login --refresh
-python src/main.py status
-python src/main.py status --online
-python src/main.py download "https://www.youtube.com/watch?v=VIDEO_ID"
-python src/main.py download "URL" --output "D:\Videos"
-python src/main.py download "URL" --format mp4
-python src/main.py download "URL" --format mp3
-python src/main.py download "URL" --exact-1080
+The window has three tabs. Only one job runs at a time, and you can cancel it
+from the button below the form.
+
+### Download
+
+Paste a YouTube link, pick where to save it, and choose a format.
+**MP4** gets the best video and audio YouTube has, without re-encoding. **MP3**
+grabs the best audio and turns it into an MP3. If you need an exact resolution,
+open **Optional quality settings** and pick 1080p or 4K. The download fails
+instead of quietly giving you something smaller.
+
+<p align="center">
+  <img src="img/gui-download.png" alt="MP4 and MP3 format buttons" width="520">
+</p>
+
+By default, files go to `local/downloads/`. If a download gets interrupted, running
+it again with the same options picks up where it left off.
+
+### Upload
+
+Pick an MP4 or MKV, give it a title (or leave it empty to use the filename), a
+description, a visibility and an audience. Uploads are **public** and **not made
+for kids** unless you change them, and the window always tells you which
+visibility you're about to use.
+
+<p align="center">
+  <img src="img/gui-upload.png" alt="Upload form with title, description, visibility and audience" width="520">
+</p>
+
+### Convert
+
+Choose an MP4 on your computer and DUTY saves an MP3 next to it with the same
+name. Your original file isn't changed, and an existing MP3 is never replaced.
+This works offline and doesn't need a YouTube login.
+
+<p align="center">
+  <img src="img/gui-convert.png" alt="Convert tab with an MP4 file picker" width="520">
+</p>
+
+### The status panel
+
+At the bottom, DUTY checks its tools and your saved login when it starts. A green
+✓ means the check passed, ○ means it's still checking or needs your attention,
+and ✕ means something failed. **Refresh login** reopens Firefox if you ever
+need to sign in again.
+
+<p align="center">
+  <img src="img/gui-status.png" alt="Status panel listing installed tools and connection checks" width="520">
+</p>
+
+A green panel means your setup is ready. It can't promise YouTube won't throw a
+bot check at you later.
+
+## Using the command line
+
+Everything the window does is also available as a command, which is handy for
+scripts, scheduled tasks or other tools.
+
+| What you want | Command |
+|---|---|
+| Sign in (or refresh the login) | `python src/main.py login` / `login --refresh` |
+| Check that everything is ready | `python src/main.py status` |
+| Download a video | `python src/main.py download "URL"` |
+| Download audio only | `python src/main.py download "URL" --format mp3` |
+| Convert an MP4 to MP3 | `python src/main.py convert "clip.mp4"` |
+| Upload a video | `python src/main.py upload "clip.mp4" --title "My video"` |
+| See past transfers | `python src/main.py history` |
+
+A few more options:
+
+```bash
+python src/main.py download "URL" --output "D:\Videos" --exact-1080
 python src/main.py download "URL" --exact-4k
-python src/main.py convert "D:\Videos\clip.mp4"
-python src/main.py convert "D:\Videos\clip.mp4" --overwrite
-python src/main.py upload "D:\Videos\clip.mkv" --title "My video"
-python src/main.py upload "D:\Videos\clip.mp4" --visibility private --description "Description"
-python src/main.py history
+python src/main.py convert "clip.mp4" --overwrite
+python src/main.py upload "clip.mkv" --visibility private --description "Behind the scenes"
+python src/main.py status --online
 ```
 
-Downloads select the best available video and audio and save MP4 without
-re-encoding. Exact-resolution options are optional and fail if unavailable.
-MP3 downloads select the best available audio and convert it using FFmpeg's
-highest MP3 VBR quality setting. Conversion does not improve the source audio.
-The separate `convert` command extracts the first audio track from an existing local
-MP4 with FFmpeg and writes an adjacent MP3 with the same filename stem. It does
-not require a YouTube session. An existing MP3 is protected unless `--overwrite`
-is specified. Local conversions do not create YouTube transfer history records.
+Run `python src/main.py --help` (or `--help` after any command) to see everything.
 
-The default output directory is `local/downloads/`. Repeating identical download
-options resumes matching partial files or reuses a verified completed file.
+### Upload details from a file
 
-Upload metadata is optional. With no metadata, the title is the filename, the
-description is empty and settings supply visibility/audience. An adjacent
-`metadata.json` is used when present, or specify `--metadata PATH`:
+Instead of passing the title and description on the command line, you can put a
+`metadata.json` next to the video (or point to one with `--metadata PATH`):
 
 ```json
 {"title": "My video", "description": "", "visibility": "public", "made_for_kids": false}
 ```
 
-Explicit CLI fields override metadata, which overrides `settings.toml`.
-`--headless` hides the upload browser; login remains visible. Use `--made-for-kids`
-or `--no-made-for-kids` to override audience. Original input files remain untouched.
-This version handles single videos only: no batches, search, direct attachment URLs,
-scheduling, thumbnails, tags, playlists or editing existing videos.
+Command-line options win over the file, and the file wins over `settings.toml`.
+Use `--made-for-kids` / `--no-made-for-kids` to set the audience, and
+`--headless` to hide the upload browser. The login window is always visible.
 
-For automation:
+### Automating it
 
-```text
+Add `--json` for machine-readable output and `--non-interactive` so DUTY never
+pops up a login window in the middle of a script:
+
+```bash
 python src/main.py --json --non-interactive download "URL"
-python src/main.py --json --non-interactive upload "clip.mkv" --visibility private
 ```
 
-JSON goes to stdout and progress to stderr. Noninteractive mode returns a login
-error instead of opening a login window. Exit codes: **0** success, **1** failure
-or unresolved, **2** login required, **130** cancelled before an uncertain upload.
+The JSON result goes to stdout and progress goes to stderr. Exit codes are
+`0` success, `1` failure (or an upload that couldn't be confirmed), `2` login
+needed and `130` cancelled.
 
-## Python helpers
+## Using it from Python
 
-Use portable Python, or install `requirements.txt` into your Python 3.11 environment.
-Put a script in the repository root, or include the root in its Python import path:
+If you'd rather call DUTY from your own script, put the script in the project
+folder (or add the folder to your import path) and use the same helpers the app
+uses:
 
 ```python
 from src.core import Config
-from src.download import download_video
-from src.download import convert_video
-from src.upload import upload_video  # run_single_upload remains an alias
+from src.download import download_video, convert_video
+from src.upload import upload_video
 
 config = Config()
 config.non_interactive = True
+
 result = download_video("https://www.youtube.com/watch?v=VIDEO_ID", config=config)
 print(result.to_dict())
 
-# Convert a local file without accessing YouTube:
-# result = convert_video("clip.mp4", config=config)
-
-# Upload only when intended:
-# result = upload_video("clip.mkv", config=config, title="My video", visibility="private")
+# convert_video("clip.mp4", config=config)
+# upload_video("clip.mkv", config=config, title="My video", visibility="private")
 ```
 
-Helpers share initialization, locking, authentication and history with the GUI/CLI.
-`Config.cancel_event.set()` requests cooperative cancellation; `Config.on_event`
-can receive progress/status dictionaries. Embedded operations restore temporary
-process environment settings afterward.
+`config.on_event` receives progress updates, and `config.cancel_event.set()`
+asks the current job to stop.
 
-## Saved state and recovery
+## Where your stuff lives
 
-`settings.toml` is the only configuration file. No `.env` is loaded. Everything
-private or generated lives under the Git-ignored `local/`, including saved login,
-tools, cookies, downloads, history and caches. Move the whole folder to retain
-your installation. Do not share `local/` with other users; each channel needs
-its own installation.
+- **`settings.toml`** has the upload defaults (visibility, audience, headless)
+  and a few timeouts. It's the only config file.
+- **`local/`** holds everything else: the downloaded tools, your saved login and
+  cookies, downloads, history and caches. It's ignored by Git.
 
-An upload can become uncertain after attachment. DUTY preserves its ID and refuses
-to submit the same file again. The uploader first checks Studio's save signal,
-then checks matching metadata for the same video for up to two minutes.
-If it remains unresolved, inspect that video in Studio and explicitly reconcile:
+You can move the whole folder somewhere else and it keeps working. Don't share
+your `local/` folder with anyone, though, because it's signed in to your account.
+If you manage more than one channel, use a separate copy of DUTY for each.
 
-```text
+## If an upload gets stuck
+
+Occasionally YouTube Studio doesn't clearly confirm that an upload finished.
+When that happens, DUTY marks the upload as *unresolved* and refuses to upload
+the same file again, so you never end up with a duplicate video. It also happens
+if you cancel or close the window after the file has started uploading.
+
+Check your channel in YouTube Studio, then tell DUTY what happened:
+
+```bash
 python src/main.py history --resolve upload_JOB_ID --status completed --video-id VIDEO_ID
 ```
 
-Use `--status failed` only after confirming no video was created; it permits a retry.
-Cancelling or closing the window after attachment can leave an unresolved upload.
+If you're sure no video was created, use `--status failed` instead. That lets you
+try the upload again.
 
-The refactored application, GUI and new completion fallback have **not been
-execution-validated**. Existing tests are historical reference, not an active suite.
+## What it doesn't do (yet)
 
-See [.agents/docs/project.md](.agents/docs/project.md) for architecture, migration
-and agent workflows. DUTY-owned code is MIT; third-party code retains its licenses
-as described in [THIRD_PARTY.md](THIRD_PARTY.md).
+DUTY handles one video at a time. It doesn't do playlists, batches, search,
+scheduled uploads, thumbnails, tags, playlist management or editing videos that
+are already on your channel.
 
-# Third-party components
+> **Heads-up:** the desktop window and some of the newer upload logic haven't been
+> fully tested yet. If something looks off, please open an issue.
 
-`LICENSE` applies to DUTY-authored code and the reused code the project owner
-has authorized for this distribution. It does not relicense `vendor/`, `local/runtime/`
-or installed dependencies. In particular, BgUtils remains GPL-3.0-only, including
-DUTY's patches to its files. Its complete vendored source and original GPL license
-must accompany the bundle. Bundled Firefox/GeckoDriver, FFmpeg and other components
-also retain their own terms. Do not describe the complete portable bundle as
-MIT-only or remove upstream notices when making an independent repository.
+## Credits & licenses
 
-The transfer implementation includes reused project-owned code.
-Upstream files retain their notices. Distribution of third-party
-components remains subject to their respective licenses.
+DUTY's own code is [MIT licensed](LICENSE). It stands on the shoulders of
+[yt-dlp](https://github.com/yt-dlp/yt-dlp), FFmpeg, Firefox, GeckoDriver, Deno,
+PySide6 and the [BgUtils PO-token provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider),
+which keep their own licenses (BgUtils is GPL-3.0). See
+[THIRD_PARTY.md](THIRD_PARTY.md) for the full details.
 
-| Component | Source / license location |
-|---|---|
-| CPython 3.11.9 | https://www.python.org/downloads/release/python-3119/ — bundled `local/runtime/python/LICENSE.txt` |
-| Firefox | https://archive.mozilla.org/pub/firefox/releases/ — Mozilla notices available in bundled Firefox `about:license` |
-| GeckoDriver | https://github.com/mozilla/geckodriver — Mozilla Public License 2.0 |
-| Deno | https://github.com/denoland/deno — MIT license |
-| FFmpeg | https://github.com/yt-dlp/FFmpeg-Builds — `local/runtime/ffmpeg/LICENSE.txt`, build source tag in `vendor/runtime-sources.json` |
-| Python packages | `requirements.txt` pins package versions; installed package metadata includes upstream license files |
-| BgUtils PO-token provider 1.3.1 | https://github.com/Brainicism/bgutil-ytdlp-pot-provider — `vendor/bgutil/LICENSE` (GPL-3.0-only), source included |
-| Provider dependencies | `vendor/bgutil/server/package-lock.json`; licenses shipped with their packages |
-
-The bootstrap also downloads build-only 7-Zip and Node.js under `local/cache/setup/`;
-these are excluded from the portable release. The vendor runtime sources file records binary
-download URLs and hashes. BgUtils TypeScript/plugin sources are included, not
-replaced by opaque executables. Firefox and FFmpeg source provenance is available
-at the versioned upstream URLs referenced above and in the runtime sources file.
-
-DUTY patches the provider in two places: its HTTP provider supports an explicit
-disable option, and its Deno command uses cached-only/manual dependency loading
-with `--no-lock` to avoid migrating the upstream Deno lock at runtime. The bundled
-Node dependency tree is installed from the preserved npm package lock during setup.
-This ensures normal use invokes the local script with packaged dependencies.
-
-PySide6 and its Qt/shiboken dependencies retain their upstream licenses and notices in installed package metadata under `local/runtime/python/Lib/site-packages/`. They are not relicensed under DUTY's MIT license.
+Working on the code? [AGENTS.md](AGENTS.md) and
+[`.agents/docs/project.md`](.agents/docs/project.md) explain how the project is put together.

@@ -5,22 +5,37 @@ description: Upload one user-requested local MP4 or MKV through DUTY's standalon
 
 # Upload with DUTY
 
-Use `local/runtime/python/python.exe src/main.py --json upload "VIDEO"` from the
-repository root. The user must have requested the upload; this skill does not
-authorize additional test uploads. Input is a local MP4/MKV, not a remote attachment.
+Only upload when the user has asked for it. This skill doesn't cover test
+uploads. From the repository root, run:
 
-Defaults are public and not made for kids. Respect requested title, description,
-visibility and audience using the CLI options or an optional metadata JSON file.
-Do not silently force private visibility for ordinary requested uploads. An
-adjacent metadata.json is used when present; explicit CLI values take precedence.
+```text
+local/runtime/python/python.exe src/main.py --json upload "VIDEO"
+```
 
-Use DUTY's saved Firefox session and configured channel. No Codex-browser upload
-path exists. Report successful completion only when the returned result confirms
-it. If unresolved, preserve the recorded ID/URL and stop: never attach the file again.
+The input has to be a local MP4 or MKV, not a link or an attachment from
+somewhere else.
 
-After the user confirms the outcome in Studio, reconcile with
-`history --resolve JOB_ID --status completed --video-id VIDEO_ID`. Mark failed only
-after confirming no video was created; that permits a subsequent retry.
+Uploads are public and not made for kids by default. Use the title, description,
+visibility and audience the user asks for, either as CLI options or in a
+metadata JSON file. Don't switch a normal upload to private on your own. If a
+`metadata.json` sits next to the video, DUTY uses it, and CLI options override it.
 
-No extra uploads, tests, snapshots or packaging. See
-[project knowledge](../../docs/project.md) for completion and authentication behavior.
+DUTY uploads through its own saved Firefox session and configured channel.
+There's no other upload path. Only tell the user the upload succeeded when the
+result says it completed.
+
+## If the upload is unresolved
+
+Keep the job ID and URL that were recorded and stop there. **Never attach the
+file again.** Ask the user to look in YouTube Studio. Once they've confirmed what
+happened, reconcile it:
+
+```text
+local/runtime/python/python.exe src/main.py history --resolve JOB_ID --status completed --video-id VIDEO_ID
+```
+
+Only use `--status failed` once the user has confirmed that no video was created.
+That's what allows a retry.
+
+No extra uploads, tests, snapshots or packaging. For how completion checks and
+login work, see [project knowledge](../../docs/project.md).

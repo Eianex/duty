@@ -5,23 +5,41 @@ description: Set up this DUTY installation and guide its owner through standalon
 
 # Set up DUTY
 
-Use the repository's Python application. A fresh clone requires Windows x64
-Python 3.11+ with pip; do not invent an agent-managed download or browser workflow.
-Run `python src/main.py setup` when setup is requested. It installs missing tools
-and packages automatically; it preserves existing local tools and saved state.
-Portable Python 3.11.9 is downloaded by setup, not shipped in Git. External pip
-uses `--python` to install through this interpreter, so dependency conditions
-and wheels match 3.11.9. Pip must be 22.3+ with Python 3.11 support; report setup's
-errors rather than silently updating external pip or changing dependency pins.
+A fresh clone needs Windows x64 Python 3.11+ with pip, and that's all. When the
+user asks for setup, run this from the repository root:
 
-After setup use `local/runtime/python/python.exe src/main.py login`. Tell the user
-to complete Google login, two-factor prompts and channel selection in the ordinary
-Firefox window. The application saves its own session. Never ask for passwords
-or claim an unrelated browser session authenticates DUTY.
+```text
+python src/main.py setup
+```
 
-For a requested authentication refresh use `login --refresh`; the configured
-channel must match. Missing packages require setup with the initial installed
-Python/pip. Network/provider errors do not justify repeated login windows.
+Setup takes care of the rest itself. It downloads portable Python 3.11.9 (that's
+not in Git), the tools and the Python packages. Whatever is already installed,
+including the saved login, is left alone. Don't build your own download or
+browser workflow around it.
 
-No live download/upload is implied by setup. Do not run tests or build ZIPs.
-See [project knowledge](../../docs/project.md) for component roles and recovery.
+Setup installs packages with the external pip, using `--python` to point it at the
+portable interpreter, so wheels and dependency markers match 3.11.9. That needs
+pip 22.3+ with Python 3.11 support. If setup reports a pip or dependency error,
+pass it on to the user. Don't quietly upgrade pip or change the pinned versions.
+
+## Signing in
+
+After setup, run:
+
+```text
+local/runtime/python/python.exe src/main.py login
+```
+
+Tell the user that a normal Firefox window will open, and that they sign in to
+Google there, get through any two-factor prompts and pick their channel. DUTY
+saves the session on its own. Never ask for their password, and don't suggest
+that being signed in in some other browser counts.
+
+If they ask to refresh the login, use `login --refresh`. It has to be the same
+channel as before. Missing packages mean setup has to run again with the
+installed Python and pip. A network or provider error isn't a reason to keep
+opening login windows.
+
+Setup doesn't mean a download or upload should happen, and it doesn't cover
+running tests or building ZIPs. For how the pieces fit together and how to
+recover, see [project knowledge](../../docs/project.md).
