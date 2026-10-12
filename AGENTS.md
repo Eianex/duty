@@ -8,6 +8,7 @@ than older notes or the legacy tests.
 For the details, read:
 
 - [Project knowledge](.agents/docs/project.md): architecture, the bundle, launcher and transfer behaviour
+- [Security review](.agents/docs/security.md): bundled upstream credentials and alert triage
 - [Setup skill](.agents/skills/duty-setup/SKILL.md)
 - [Download skill](.agents/skills/duty-download/SKILL.md)
 - [Upload skill](.agents/skills/duty-upload/SKILL.md)
