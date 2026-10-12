@@ -5,7 +5,7 @@
 <h3 align="center">Download & Upload To YouTube</h3>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" alt="Python 3.11+">
+  <img src="https://img.shields.io/badge/python-3.11.9%20bundled-3776AB?logo=python&logoColor=white" alt="Bundled Python 3.11.9">
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6" alt="Windows 10/11">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license">
 </p>
@@ -23,56 +23,46 @@ window, just like you would.
   <img src="img/gui-window.png" alt="The DUTY window, open on the Download tab" width="560">
 </p>
 
-## Before you start
-
-You need **Python 3.11 or newer** (64-bit, with pip) to get going. If you don't
-have it, grab it from [python.org](https://www.python.org/downloads/windows/) and
-tick **"Add python.exe to PATH"** in the installer.
-
-That's the only thing you install yourself. DUTY downloads everything else it
-needs (its own portable Python, Firefox, GeckoDriver, FFmpeg, Deno and the Python
-packages) into the project folder. It doesn't touch your system PATH or your
-normal browser.
-
 ## Getting started
 
-1. Clone the repo (or download it as a ZIP and extract it):
+DUTY comes with its own Python 3.11.9 x64, Python libraries, Firefox,
+GeckoDriver, FFmpeg, Deno and provider dependencies. You don't need to install
+Python, pip or any other tool, and there is no installation setup.
+Use Windows 10 or 11 x64 and extract the complete folder somewhere writable.
+
+1. Download the repository as a ZIP and extract it, or clone it with Git LFS:
 
    ```bash
+   git lfs install
    git clone https://github.com/Eianex/duty.git
    ```
 
-2. Double-click **`DUTY.exe`** in the project folder.
+   For an existing clone, run `git lfs pull` to get the bundled binary files.
 
-   The first time, DUTY notices it isn't set up yet and does it for you. A small
-   **DUTY setup** window appears and shows what's being downloaded and installed.
-   This takes a few minutes, and when it's done the app opens on its own. From
-   then on, double-clicking `DUTY.exe` opens the app straight away.
+2. Double-click **`DUTY.exe`**. It checks the bundled files locally and opens
+   the app. No terminal or installation window is needed.
 
 3. The first time you download or upload, DUTY opens Firefox and asks you to sign
-   in to Google. Sign in, get through any verification prompts and pick your
-   channel. DUTY saves the session, so you won't have to do this again for a while.
+   in to Google. Complete any verification prompts and select your channel.
+   DUTY saves that session. Local MP4-to-MP3 conversion needs no login or internet.
 
-When you pull a new version of DUTY, just open `DUTY.exe` as usual. If the update
-needs anything new, the setup window shows up again and installs only what's
-missing. Your login and history stay as they are.
+The complete extracted download is approximately 1.5 GB. Keep the entire folder
+together when moving it. Updates include the required tools; DUTY doesn't
+download or silently upgrade its dependencies. Your saved login and history are
+separate from those bundled files.
 
 <details>
-<summary>If setup can't find Python or something goes wrong</summary>
+<summary>If DUTY reports missing or incomplete files</summary>
 
-The setup window uses the Python you installed, so it has to be able to find it.
-If it can't, it tells you so. Install Python 3.11+ (with "Add python.exe to PATH"
-ticked) and double-click `DUTY.exe` again.
+Restore the missing files from a complete DUTY download. A Git LFS pointer is a
+small placeholder, not the executable: run `git lfs pull` in a Git clone.
+There is no `setup` command or automatic installation fallback.
 
-If setup fails partway, the window shows what happened, and the full log is saved
-in `local/logs/launcher-setup.log`. Double-clicking `DUTY.exe` again retries, and
-anything that was already installed is kept.
-
-You can also run setup yourself from a terminal in the project folder:
-
-```bash
-python src/main.py setup
-```
+For repository maintainers: enable **Include Git LFS objects in archives** in
+GitHub's repository settings before publishing ZIP downloads. Otherwise those
+downloads contain placeholders instead of the tools. Git LFS storage and
+download quotas apply. Run `git lfs install` inside this repository before your
+first commit/push of the bundled files, so Git LFS can upload the binary objects.
 
 </details>
 
@@ -128,7 +118,7 @@ need to sign in again.
   <img src="img/gui-status.png" alt="Status panel listing installed tools and connection checks" width="520">
 </p>
 
-A green panel means your setup is ready. It can't promise YouTube won't throw a
+A green panel means the local checks passed. It can't promise YouTube won't throw a
 bot check at you later.
 
 ## Using the command line
@@ -138,25 +128,25 @@ scripts, scheduled tasks or other tools.
 
 | What you want | Command |
 |---|---|
-| Sign in (or refresh the login) | `python src/main.py login` / `login --refresh` |
-| Check that everything is ready | `python src/main.py status` |
-| Download a video | `python src/main.py download "URL"` |
-| Download audio only | `python src/main.py download "URL" --format mp3` |
-| Convert an MP4 to MP3 | `python src/main.py convert "clip.mp4"` |
-| Upload a video | `python src/main.py upload "clip.mp4" --title "My video"` |
-| See past transfers | `python src/main.py history` |
+| Sign in (or refresh the login) | `local/runtime/python/python.exe src/main.py login` / `login --refresh` |
+| Check that everything is ready | `local/runtime/python/python.exe src/main.py status` |
+| Download a video | `local/runtime/python/python.exe src/main.py download "URL"` |
+| Download audio only | `local/runtime/python/python.exe src/main.py download "URL" --format mp3` |
+| Convert an MP4 to MP3 | `local/runtime/python/python.exe src/main.py convert "clip.mp4"` |
+| Upload a video | `local/runtime/python/python.exe src/main.py upload "clip.mp4" --title "My video"` |
+| See past transfers | `local/runtime/python/python.exe src/main.py history` |
 
 A few more options:
 
 ```bash
-python src/main.py download "URL" --output "D:\Videos" --exact-1080
-python src/main.py download "URL" --exact-4k
-python src/main.py convert "clip.mp4" --overwrite
-python src/main.py upload "clip.mkv" --visibility private --description "Behind the scenes"
-python src/main.py status --online
+local/runtime/python/python.exe src/main.py download "URL" --output "D:\Videos" --exact-1080
+local/runtime/python/python.exe src/main.py download "URL" --exact-4k
+local/runtime/python/python.exe src/main.py convert "clip.mp4" --overwrite
+local/runtime/python/python.exe src/main.py upload "clip.mkv" --visibility private --description "Behind the scenes"
+local/runtime/python/python.exe src/main.py status --online
 ```
 
-Run `python src/main.py --help` (or `--help` after any command) to see everything.
+Run `local/runtime/python/python.exe src/main.py --help` (or `--help` after any command) to see everything.
 
 ### Upload details from a file
 
@@ -177,7 +167,7 @@ Add `--json` for machine-readable output and `--non-interactive` so DUTY never
 pops up a login window in the middle of a script:
 
 ```bash
-python src/main.py --json --non-interactive download "URL"
+local/runtime/python/python.exe src/main.py --json --non-interactive download "URL"
 ```
 
 The JSON result goes to stdout and progress goes to stderr. Exit codes are
@@ -187,8 +177,8 @@ needed and `130` cancelled.
 ## Using it from Python
 
 If you'd rather call DUTY from your own script, put the script in the project
-folder (or add the folder to your import path) and use the same helpers the app
-uses:
+folder (or add the folder to your import path), run it with
+`local/runtime/python/python.exe your_script.py`, and use the same helpers the app uses:
 
 ```python
 from src.core import Config
@@ -212,8 +202,10 @@ asks the current job to stop.
 
 - **`settings.toml`** has the upload defaults (visibility, audience, headless)
   and a few timeouts. It's the only config file.
-- **`local/`** holds everything else: the downloaded tools, your saved login and
-  cookies, downloads, history and caches. It's ignored by Git.
+- **`local/runtime/`** and **`local/provider/server/`** contain the bundled tools
+  and libraries. These public dependency files are included in Git.
+- Other **`local/`** folders hold your saved login, cookies, downloads, history
+  and working caches. These private and generated files stay ignored by Git.
 
 You can move the whole folder somewhere else and it keeps working. Don't share
 your `local/` folder with anyone, though, because it's signed in to your account.
@@ -229,7 +221,7 @@ if you cancel or close the window after the file has started uploading.
 Check your channel in YouTube Studio, then tell DUTY what happened:
 
 ```bash
-python src/main.py history --resolve upload_JOB_ID --status completed --video-id VIDEO_ID
+local/runtime/python/python.exe src/main.py history --resolve upload_JOB_ID --status completed --video-id VIDEO_ID
 ```
 
 If you're sure no video was created, use `--status failed` instead. That lets you

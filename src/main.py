@@ -12,7 +12,7 @@ sys.pycache_prefix = str(ROOT / "local/cache/pycache")
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.core import Config, History, Result, Cancelled, LoginRequired, error_code, now, operation_context, setup, setup_ready, status
+from src.core import Config, History, Result, Cancelled, LoginRequired, error_code, now, operation_context, bundle_ready, status
 
 
 def parser():
@@ -20,10 +20,8 @@ def parser():
     cli.add_argument("--json", action="store_true", help="Machine-readable output; progress goes to stderr")
     cli.add_argument("--non-interactive", action="store_true", help="Return login_required instead of opening login")
     sub = cli.add_subparsers(dest="command", required=True)
-    prepare = sub.add_parser("setup", help="Install missing project-local tools and dependencies")
-    prepare.add_argument("--check", action="store_true", help=argparse.SUPPRESS)
-    prepare.add_argument("--launcher-progress", action="store_true", help=argparse.SUPPRESS)
     check = sub.add_parser("status", help="Show installed tools, saved session and provider readiness")
+    check.add_argument("--check", action="store_true", help=argparse.SUPPRESS)
     check.add_argument("--online", action="store_true", help="Establish or refresh saved login when needed; no Studio verification")
     login = sub.add_parser("login", help="Sign in through Firefox")
     login.add_argument("--refresh", action="store_true")
@@ -73,12 +71,8 @@ def reconcile(config, job_id, outcome, video_id=None):
 
 
 def dispatch(args, config):
-    if args.command == "setup":
-        if args.check:
-            return setup_ready(config)
-        return setup(config)
     if args.command == "status":
-        return status(config, online=args.online)
+        return bundle_ready(config) if args.check else status(config, online=args.online)
     if args.command == "history":
         if args.resolve:
             return {"ok": True, "record": reconcile(config, args.resolve, args.status, args.video_id)}
@@ -108,21 +102,16 @@ def main(argv=None):
     flags = {"--json", "--non-interactive"}
     args = parser().parse_args([x for x in argv if x in flags] + [x for x in argv if x not in flags])
     portable = ROOT / "local/runtime/python/python.exe"
-    if args.command != "setup" and portable.is_file() and Path(sys.executable).resolve() != portable.resolve():
+    if portable.is_file() and Path(sys.executable).resolve() != portable.resolve():
         import subprocess
         return subprocess.call([str(portable), str(Path(__file__).resolve()), *argv])
     try:
+        if not portable.is_file():
+            raise FileNotFoundError("Bundled Python is missing; restore the complete DUTY download")
         config = Config()
         config.non_interactive = args.non_interactive
-        if args.command == "setup" and args.launcher_progress:
-            def report_setup(event):
-                message = event.get("message")
-                if message:
-                    print("DUTY_SETUP\t" + str(message).replace("\t", " ").replace("\n", " "),
-                          file=sys.stderr, flush=True)
-            config.on_event = report_setup
-        if args.command == "setup" and args.check:
-            payload = setup_ready(config)
+        if args.command == "status" and args.check:
+            payload = bundle_ready(config)
         else:
             with operation_context(config), redirect_stdout(sys.stderr):
                 payload = dispatch(args, config)

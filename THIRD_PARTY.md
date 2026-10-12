@@ -23,8 +23,8 @@ components remains subject to their respective licenses.
 | BgUtils PO-token provider 1.3.1 | https://github.com/Brainicism/bgutil-ytdlp-pot-provider — `vendor/bgutil/LICENSE` (GPL-3.0-only), source included |
 | Provider dependencies | `vendor/bgutil/server/package-lock.json`; licenses shipped with their packages |
 
-The bootstrap also downloads build-only 7-Zip and Node.js under `local/cache/setup/`;
-these are excluded from the portable release. The vendor runtime sources file records binary
+Historical build-only 7-Zip and Node.js files under `local/cache/setup/` remain
+excluded. DUTY no longer downloads or installs dependencies. The vendor runtime sources file records binary
 download URLs and hashes. BgUtils TypeScript/plugin sources are included, not
 replaced by opaque executables. Firefox and FFmpeg source provenance is available
 at the versioned upstream URLs referenced above and in the runtime sources file.
@@ -32,7 +32,12 @@ at the versioned upstream URLs referenced above and in the runtime sources file.
 DUTY patches the provider in two places: its HTTP provider supports an explicit
 disable option, and its Deno command uses cached-only/manual dependency loading
 with `--no-lock` to avoid migrating the upstream Deno lock at runtime. The bundled
-Node dependency tree is installed from the preserved npm package lock during setup.
-This ensures normal use invokes the local script with packaged dependencies.
+Node dependency tree is preserved from the existing installation; its installed
+lock is `local/provider/server/node_modules/.package-lock.json`, and upstream
+locks remain available in vendor.
+Normal use invokes the local script with packaged dependencies. Public npm
+metadata under `vendor/deno-cache/npm/` seeds the private working cache; it
+contains no provider sessions. `vendor/bundle-manifest.json` records the included
+files, component versions, source provenance and checksums.
 
 PySide6 and its Qt/shiboken dependencies retain their upstream licenses and notices in installed package metadata under `local/runtime/python/Lib/site-packages/`. They are not relicensed under DUTY's MIT license.

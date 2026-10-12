@@ -1,11 +1,29 @@
-# DUTY tools, credentials, environments and generated files
-/local/
+# Personal and generated data stay private. Only bundled tools are included.
+/local/*
+!/local/runtime/
+/local/runtime/*
+!/local/runtime/python/
+!/local/runtime/firefox/
+!/local/runtime/geckodriver/
+!/local/runtime/deno/
+!/local/runtime/ffmpeg/
+!/local/provider/
+/local/provider/*
+!/local/provider/server/
 
-# Incidental Python/editor files
+# Incidental Python/editor files, including those within bundled packages.
 __pycache__/
 *.py[cod]
+!/local/runtime/python/**/*.pyd
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
 *.psb
+/local/runtime/ffmpeg/ffplay.exe
+/local/runtime/python/**/.cache/
+/local/runtime/python/Lib/site-packages/bin/
+/local/provider/server/**/.cache/
+/local/provider/server/**/.env
+/local/provider/server/**/.npmrc
+/DUTY.lnk

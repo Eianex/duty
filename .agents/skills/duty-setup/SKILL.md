@@ -1,45 +1,35 @@
 ---
 name: duty-setup
-description: Set up this DUTY installation and guide its owner through standalone Firefox login when they request setup or authentication repair.
+description: Check DUTY's bundled installation and guide its owner through standalone Firefox login when they request first use or authentication repair.
 ---
 
-# Set up DUTY
+# Prepare to use DUTY
 
-A fresh clone needs Windows x64 Python 3.11+ with pip, and that's all. When the
-user asks for setup, run this from the repository root:
+DUTY includes Python, tools and dependencies; there is no installation setup.
+When the user requests setup or environment repair, inspect readiness from the root:
 
 ```text
-python src/main.py setup
+local/runtime/python/python.exe src/main.py --json status --check
 ```
 
-Setup takes care of the rest itself. It downloads portable Python 3.11.9 (that's
-not in Git), the tools and the Python packages. Whatever is already installed,
-including the saved login, is left alone. Don't build your own download or
-browser workflow around it.
-
-Setup installs packages with the external pip, using `--python` to point it at the
-portable interpreter, so wheels and dependency markers match 3.11.9. That needs
-pip 22.3+ with Python 3.11 support. If setup reports a pip or dependency error,
-pass it on to the user. Don't quietly upgrade pip or change the pinned versions.
+This check is offline and ignores login. If bundled Python itself is missing,
+restore the complete download. For missing Git LFS binaries in a clone, explain
+`git lfs pull`. Do not install system Python, pip or packages, change pins, or
+create another download/browser workflow.
 
 ## Signing in
 
-After setup, run:
+When the user requests login, run:
 
 ```text
 local/runtime/python/python.exe src/main.py login
 ```
 
-Tell the user that a normal Firefox window will open, and that they sign in to
-Google there, get through any two-factor prompts and pick their channel. DUTY
-saves the session on its own. Never ask for their password, and don't suggest
-that being signed in in some other browser counts.
+Explain that the user signs in themselves in the Firefox window DUTY opens,
+completes verification and selects their channel. DUTY saves the session.
+Never ask for or store their password. Use `login --refresh` only when requested;
+the configured channel still applies. Network/provider failures are not a reason
+to repeatedly open login windows.
 
-If they ask to refresh the login, use `login --refresh`. It has to be the same
-channel as before. Missing packages mean setup has to run again with the
-installed Python and pip. A network or provider error isn't a reason to keep
-opening login windows.
-
-Setup doesn't mean a download or upload should happen, and it doesn't cover
-running tests or building ZIPs. For how the pieces fit together and how to
-recover, see [project knowledge](../../docs/project.md).
+Environment repair does not authorize transfers, tests or ZIP builds.
+See [project knowledge](../../docs/project.md) for recovery and architecture.

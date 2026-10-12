@@ -7,7 +7,7 @@ than older notes or the legacy tests.
 
 For the details, read:
 
-- [Project knowledge](.agents/docs/project.md): architecture, setup, the launcher and transfer behaviour
+- [Project knowledge](.agents/docs/project.md): architecture, the bundle, launcher and transfer behaviour
 - [Setup skill](.agents/skills/duty-setup/SKILL.md)
 - [Download skill](.agents/skills/duty-download/SKILL.md)
 - [Upload skill](.agents/skills/duty-upload/SKILL.md)
@@ -17,8 +17,10 @@ For the details, read:
 - All application code lives in the six files in `src/`. Commands go in
   `src/main.py`, and the desktop window lives in `src/gui.py`. Please don't add
   new modules or root-level wrapper scripts.
-- Installed tools and anything private or generated (logins, cookies,
-  downloads, history, caches) belong under `local/`, which Git ignores.
+- Bundled tools and dependencies live in `local/runtime/` and
+  `local/provider/server/` and are included in Git, with binaries in Git LFS.
+  Private/generated data (logins, cookies, downloads, history, caches) lives
+  elsewhere under `local/` and stays ignored. Preserve that separation.
 - `DUTY.exe` in the root is built from `src/launcher.cs`. The build steps are in
   project knowledge.
 - There's one `settings.toml` and one `requirements.txt`. Keep it that way.
@@ -45,6 +47,6 @@ user opts into:
   a way around the configured channel. Ask the user to check Studio and reconcile
   it (see the upload skill).
 - Never store passwords in the source or in settings.
-- Setup downloads its own dependencies, so skills should just run the app. When
+- Dependencies already ship with the repo; do not install them or run setup. When
   a login is needed, explain that the user signs in themselves in the Firefox
   window DUTY opens.

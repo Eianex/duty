@@ -1,0 +1,13 @@
+/local/runtime/** -text
+/local/provider/server/** -text
+/vendor/deno-cache/** -text
+/local/runtime/**/*.exe filter=lfs diff=lfs merge=lfs -text
+/local/runtime/**/*.dll filter=lfs diff=lfs merge=lfs -text
+/local/runtime/**/*.pyd filter=lfs diff=lfs merge=lfs -text
+/local/runtime/**/*.zip filter=lfs diff=lfs merge=lfs -text
+/local/runtime/**/*.pak filter=lfs diff=lfs merge=lfs -text
+/local/runtime/**/*.rcc filter=lfs diff=lfs merge=lfs -text
+/local/runtime/**/*.lib filter=lfs diff=lfs merge=lfs -text
+/local/provider/server/node_modules/**/*.node filter=lfs diff=lfs merge=lfs -text
+/local/provider/server/node_modules/**/*.dll filter=lfs diff=lfs merge=lfs -text
+/local/provider/server/node_modules/**/*.exe filter=lfs diff=lfs merge=lfs -text

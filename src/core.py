@@ -1,4 +1,4 @@
-"""Shared paths, configuration, setup and operation lifecycle for DUTY."""
+"""Shared paths, configuration, bundled tools and operation lifecycle for DUTY."""
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -19,11 +19,8 @@ import sys
 import sysconfig
 import tempfile
 import threading
-import time
 import tomllib
-import urllib.request
 import uuid
-import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL_NAMES = {"runtime", "permanent", "work", "downloads", "history", "logs", "cache", "dist", "provider"}
@@ -88,6 +85,7 @@ class Config:
         os.environ["DENO_NO_UPDATE_CHECK"] = os.environ["DENO_NO_PROMPT"] = "1"
         os.environ["PYTHONPYCACHEPREFIX"] = str(self.path("cache", "pycache"))
         sys.pycache_prefix = str(self.path("cache", "pycache"))
+        seed_deno_cache(self)
 
     def timeout(self, name):
         return float(self.values["timeouts"][name])
@@ -103,7 +101,7 @@ class Config:
 
 @contextmanager
 def installation_lock(config):
-    """A stdlib lock works even before third-party requirements are installed."""
+    """Serialize operations without depending on third-party locks."""
     path = config.root / "local" / "duty.lock"
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a+b") as stream:
@@ -148,20 +146,6 @@ def migrate_layout(config):
             target.resolve().relative_to(root)
             target.parent.mkdir(parents=True, exist_ok=True)
             source.rename(target)
-    # Runtime provider code is a local copy so native dependencies stay under local/.
-    source = root / "vendor/bgutil/server"
-    server = config.path("provider/server")
-    if source.exists() and (server / "node_modules").exists() and not (server / "src").exists():
-        shutil.copytree(source, server, dirs_exist_ok=True,
-                        ignore=shutil.ignore_patterns("node_modules", ".git", "__pycache__"))
-    python_pth = config.path("runtime/python/python311._pth")
-    if python_pth.exists():
-        with python_pth.open(encoding="utf-8", newline="") as stream:
-            content = stream.read()
-        updated = content.replace("..\\..\\", "..\\..\\..\\") if "..\\..\\..\\" not in content else content
-        if content != updated:
-            with python_pth.open("w", encoding="utf-8", newline="") as stream:
-                stream.write(updated)
     # Only recorded media paths are relocated. Browser databases are left intact.
     for path in config.path("history").glob("*.json"):
         row = json.loads(path.read_text(encoding="utf-8"))
@@ -266,28 +250,72 @@ def _provider_installed(config):
     )
 
 
-def setup_ready(config):
-    """Local installer readiness; never checks authentication or the network."""
+def bundle_ready(config):
+    """Check installed files and pins locally, independently of login and network."""
     missing = []
     python = config.tool("python")
     if (os.name != "nt" or sys.implementation.name != "cpython"
             or sys.version_info[:3] != (3, 11, 9)
             or sysconfig.get_platform() != "win-amd64"
-            or Path(sys.executable).resolve() != python.resolve()):
-        missing.append("portable CPython 3.11.9 Windows x64")
-    for path in (python, python.with_name("pythonw.exe"),
-                 config.path("runtime/python/python311.zip"),
-                 config.path("runtime/python/python311._pth")):
-        if not path.is_file():
-            missing.append(str(path))
-    for name in ("firefox", "geckodriver", "deno", "ffmpeg", "ffprobe"):
-        if not config.tool(name).is_file():
-            missing.append(str(config.tool(name)))
+            or Path(sys.executable).resolve() not in {python.resolve(), python.with_name("pythonw.exe").resolve()}):
+        missing.append("bundled CPython 3.11.9 Windows x64")
+    manifest_path = config.path("vendor/bundle-manifest.json")
+    if not manifest_path.is_file():
+        missing.append("vendor/bundle-manifest.json")
+    else:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("format") != 1 or not manifest.get("files"):
+            raise ValueError("Invalid bundle manifest; restore the complete DUTY download")
+        for entry in manifest["files"]:
+            relative = entry["path"]
+            path = config.root / relative
+            path.resolve().relative_to(config.root)
+            if not path.is_file():
+                missing.append(relative + ": missing")
+                continue
+            size = path.stat().st_size
+            if size != entry["size"]:
+                pointer = False
+                if size < 1024:
+                    with path.open("rb") as stream:
+                        pointer = stream.read(100).startswith(b"version https://git-lfs.github.com/spec/v1")
+                missing.append(relative + (": Git LFS pointer; run git lfs pull or get a complete download"
+                                           if pointer else ": unexpected size; restore this file"))
     missing.extend(dependency_versions(config))
     if not _provider_installed(config):
-        missing.append("local provider dependencies")
+        missing.append("bundled provider dependencies")
     return {"ok": not missing, "missing": missing,
-            "message": "Local setup ready" if not missing else "Local setup needs attention"}
+            "message": "Bundled tools ready" if not missing else "Incomplete DUTY bundle; restore the complete download"}
+
+
+def seed_deno_cache(config):
+    """Copy only absent public dependency metadata; working caches remain private."""
+    seed = config.path("vendor/deno-cache/npm")
+    if not seed.is_dir():
+        raise FileNotFoundError("Missing Deno dependency seed; restore the complete DUTY download")
+    target = config.path("cache/deno/npm")
+    marker = target.parent / "duty-seed.json"
+    manifest = config.path("vendor/bundle-manifest.json")
+    fingerprint = hashlib.sha256(manifest.read_bytes()).hexdigest()
+    if marker.is_file() and json.loads(marker.read_text(encoding="utf-8")).get("manifest") == fingerprint:
+        return
+    for source in seed.rglob("*"):
+        if source.is_file():
+            destination = target / source.relative_to(seed)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            created = False
+            try:
+                with destination.open("xb") as out:
+                    created = True
+                    with source.open("rb") as incoming:
+                        shutil.copyfileobj(incoming, out)
+            except FileExistsError:
+                continue
+            except BaseException:
+                if created:
+                    destination.unlink(missing_ok=True)
+                raise
+    atomic_json(marker, {"manifest": fingerprint})
 
 
 def status(config, *, online=False, refresh=False):
@@ -299,7 +327,7 @@ def status(config, *, online=False, refresh=False):
         config.emit("health", **row)
     for name in ("python", "firefox", "geckodriver", "deno", "ffmpeg", "ffprobe"):
         path = config.tool(name)
-        report(name, "green" if path.is_file() else "red", "Installed" if path.is_file() else "Missing; run setup")
+        report(name, "green" if path.is_file() else "red", "Installed" if path.is_file() else "Missing; restore the complete DUTY download")
     missing = dependency_versions(config)
     report("dependencies", "red" if missing else "green", "; ".join(missing) if missing else "Pinned Python packages installed")
     try:
@@ -319,7 +347,7 @@ def status(config, *, online=False, refresh=False):
     channel = bound_channel(config)
     report("account", "green" if channel else "orange", channel or "Sign-in required")
     if missing:
-        report("cookies", "orange", "Not checked; run setup")
+        report("cookies", "orange", "Not checked; restore missing bundled components")
         return {"ok": False, "channel_id": channel, "checks": checks}
     from .session import Auth
     auth = Auth(config)
@@ -345,162 +373,6 @@ def status(config, *, online=False, refresh=False):
     # Later entries supersede earlier checks for the same component.
     latest = {row["name"]: row for row in checks}
     return {"ok": all(row["state"] != "red" for row in latest.values()), "channel_id": channel, "checks": list(latest.values())}
-
-
-def _run_setup(config, *command, message="Installing required components…", **kwargs):
-    config.check_cancel()
-    config.emit("message", message=message)
-    kwargs.setdefault("creationflags", getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    subprocess.run(list(map(str, command)), check=True, **kwargs)
-
-
-def setup(config):
-    """Install missing local tools only; existing runtime components are reused."""
-    if os.name != "nt" or sys.version_info[:2] < (3, 11) or sysconfig.get_platform() != "win-amd64":
-        raise RuntimeError("Initial setup requires Windows x64 Python 3.11+ with pip")
-    sources = json.loads(config.path("vendor/runtime-sources.json").read_text())
-    cache = config.path("cache/setup")
-    cache.mkdir(parents=True, exist_ok=True)
-    def archive(name):
-        config.check_cancel()
-        source = sources[name]
-        path = cache / (name + (".exe" if name in {"firefox", "7zr"} else ".zip"))
-        if not path.is_file():
-            config.emit("message", message=f"Downloading {name}")
-            partial = path.with_suffix(".partial")
-            with urllib.request.urlopen(source["url"], timeout=120) as response, partial.open("wb") as stream:
-                total = response.headers.get("Content-Length")
-                total = int(total) if total and total.isdecimal() else None
-                downloaded = 0
-                last_report = 0.0
-                while chunk := response.read(1024 * 1024):
-                    config.check_cancel()
-                    stream.write(chunk)
-                    downloaded += len(chunk)
-                    current = time.monotonic()
-                    if current - last_report >= 0.5 or (total and downloaded >= total):
-                        detail = f"Downloading {name}: {downloaded // (1024 * 1024)} MB"
-                        if total:
-                            detail += f" / {total // (1024 * 1024)} MB"
-                        config.emit("message", message=detail)
-                        last_report = current
-            partial.replace(path)
-        if file_hash(path) != source["sha256"]:
-            raise RuntimeError(f"Checksum mismatch for {name}; remove {path} and run setup again")
-        return path
-    for name in ("python", "firefox", "geckodriver", "deno", "ffmpeg"):
-        complete = config.tool(name).is_file()
-        if name == "python":
-            complete = complete and config.tool("python").with_name("pythonw.exe").is_file()
-        if name == "ffmpeg":
-            complete = complete and config.tool("ffprobe").is_file()
-        if complete:
-            continue
-        config.emit("message", message=f"Preparing {name}")
-        target = config.path("runtime", name)
-        if target.exists():
-            raise RuntimeError(f"Incomplete component at {target}; move it aside before setup")
-        stage = Path(tempfile.mkdtemp(prefix=name + "_", dir=cache))
-        payload = stage / "payload"
-        payload.mkdir()
-        if name == "firefox":
-            _run_setup(config, archive("7zr"), "x", archive("firefox"), "-o" + str(stage / "extracted"), "-y",
-                       message="Extracting Firefox", stdout=subprocess.DEVNULL)
-            shutil.copytree(stage / "extracted/core", payload, dirs_exist_ok=True)
-            policy = payload / "distribution/policies.json"
-            policy.parent.mkdir(exist_ok=True)
-            atomic_json(policy, {"policies": {"DisableAppUpdate": True, "DisableTelemetry": True, "DontCheckDefaultBrowser": True}})
-        elif name == "ffmpeg":
-            with zipfile.ZipFile(archive(name)) as z:
-                for item in z.infolist():
-                    if item.is_dir():
-                        continue
-                    relative = Path(*Path(item.filename).parts[1:])
-                    destination = payload / (relative.name if relative.parts[0] == "bin" else relative)
-                    destination.resolve().relative_to(payload.resolve())
-                    destination.parent.mkdir(parents=True, exist_ok=True)
-                    with z.open(item) as source, destination.open("wb") as out:
-                        shutil.copyfileobj(source, out)
-        else:
-            with zipfile.ZipFile(archive(name)) as z:
-                for item in z.infolist():
-                    (payload / item.filename).resolve().relative_to(payload.resolve())
-                z.extractall(payload)
-        if name in {"geckodriver", "deno"}:
-            shutil.copy2(archive(name + "_license"), payload / "LICENSE.txt")
-        if not (payload / config.tool(name).name).is_file():
-            raise RuntimeError(f"Downloaded {name} archive did not contain its executable")
-        target.parent.mkdir(parents=True, exist_ok=True)
-        payload.rename(target)
-    pth = config.path("runtime/python/python311._pth")
-    with pth.open("w", encoding="utf-8", newline="") as stream:
-        stream.write("python311.zip\n.\nLib/site-packages\n..\\..\\..\\\nimport site\n")
-    python = config.tool("python")
-    try:
-        identity = subprocess.run([str(python), "-B", "-c",
-            "import json,sys,sysconfig; print(json.dumps([sys.implementation.name,"
-            "list(sys.version_info[:3]),sysconfig.get_platform()]))"],
-            check=True, capture_output=True, text=True, timeout=30,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        if json.loads(identity.stdout) != ["cpython", [3, 11, 9], "win-amd64"]:
-            raise ValueError("Expected CPython 3.11.9 Windows x64")
-    except (OSError, subprocess.SubprocessError, ValueError) as exc:
-        raise RuntimeError("Local Python must run as CPython 3.11.9 Windows x64. "
-                           "Move the incompatible local/runtime/python folder aside and rerun setup.") from exc
-    packages = config.path("runtime/python/Lib/site-packages")
-    installed = {d.metadata["Name"].lower().replace("_", "-"): d.version for d in importlib.metadata.distributions(path=[str(packages)])}
-    requirements = [line.strip() for line in config.path("requirements.txt").read_text().splitlines() if line.strip() and not line.startswith("#")]
-    missing = [line for line in requirements if installed.get(line.split("==")[0].lower().replace("_", "-")) != line.split("==")[1]]
-    if missing:
-        # External pip runs in a separate process through the actual portable
-        # interpreter, so wheel selection and dependency markers both use 3.11.9.
-        if Path(sys.executable).resolve() in {python.resolve(), python.with_name("pythonw.exe").resolve()}:
-            raise RuntimeError("Run dependency setup using external Windows x64 Python 3.11+ with pip; portable Python has no pip.")
-        try:
-            pip_version = importlib.metadata.version("pip")
-        except importlib.metadata.PackageNotFoundError as exc:
-            raise RuntimeError("The setup launcher needs pip. Use Windows x64 Python 3.11+ with pip.") from exc
-        version = re.match(r"^(\d+)\.(\d+)", pip_version)
-        if not version or tuple(map(int, version.groups())) < (22, 3):
-            raise RuntimeError("Setup needs pip 22.3 or newer for --python. Update pip in the external Python and retry.")
-        pip_command = [sys.executable, "-m", "pip", "--isolated", "--python", str(python)]
-        try:
-            subprocess.run([*pip_command, "--version"], check=True, capture_output=True,
-                           text=True, timeout=30, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        except (OSError, subprocess.SubprocessError) as exc:
-            detail = (getattr(exc, "stderr", None) or str(exc)).strip()
-            raise RuntimeError("External pip could not run through portable Python 3.11.9. "
-                               "Use a pip release supporting --python and Python 3.11. " + detail) from exc
-        try:
-            # Resolve all pins together, not just missing packages, to keep
-            # transitive dependencies consistent with the complete requirements.
-            _run_setup(config, *pip_command, "install", "--only-binary=:all:", "--upgrade", "--target", packages,
-                       "--cache-dir", config.path("cache/pip"), "-r", config.path("requirements.txt"),
-                       message="Installing Python packages")
-        except subprocess.CalledProcessError as exc:
-            raise RuntimeError("Dependency installation failed. Review pip's error above for unavailable Python 3.11 "
-                               "Windows x64 wheels, conflicting pins or network errors, then retry setup. "
-                               "DUTY does not compile packages or relax its pins.") from exc
-    server = config.path("provider/server")
-    if not _provider_installed(config):
-        stage = Path(tempfile.mkdtemp(prefix="provider_", dir=cache))
-        staged_server = stage / "server"
-        shutil.copytree(config.path("vendor/bgutil/server"), staged_server,
-                        ignore=shutil.ignore_patterns("node_modules", ".git", "__pycache__"))
-        with zipfile.ZipFile(archive("node_build")) as z:
-            z.extractall(stage / "node")
-        node = next((stage / "node").glob("*/node.exe"))
-        env = os.environ.copy()
-        env["PATH"] = str(node.parent) + os.pathsep + env.get("PATH", "")
-        env["npm_config_cache"] = str(config.path("cache/npm"))
-        _run_setup(config, node, node.parent / "node_modules/npm/bin/npm-cli.js", "ci", "--omit=dev", "--no-audit", "--no-fund",
-                   cwd=staged_server, env=env, message="Installing provider packages")
-        if server.exists():
-            backup = server.with_name("server_previous_" + uuid.uuid4().hex)
-            server.rename(backup)
-        server.parent.mkdir(parents=True, exist_ok=True)
-        staged_server.rename(server)
-    return {"ok": True, "python": str(config.tool("python")), "message": "Setup complete. Double-click DUTY.exe to open the app."}
 
 
 # Transfer records and errors retained from the original implementation.

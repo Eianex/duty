@@ -158,7 +158,7 @@ class BrowserSession:
         profile.mkdir(parents=True, exist_ok=True)
         for name in ("firefox", "geckodriver"):
             if not config.tool(name).is_file():
-                raise FileNotFoundError(f"Missing bundled {name}; run python src/main.py setup")
+                raise FileNotFoundError(f"Missing bundled {name}; restore the complete DUTY download")
 
         def driver_factory(**kwargs):
             # selenium-firefox prepares preferences in a cloned profile. Keep those

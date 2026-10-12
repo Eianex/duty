@@ -1,4 +1,4 @@
-"""Minimal desktop interface. Launch with DUTY's portable Python after setup."""
+"""Minimal desktop interface. Launch with DUTY's bundled Python."""
 
 from __future__ import annotations
 
@@ -53,8 +53,8 @@ try:
     )
 except ImportError:
     raise SystemExit(
-        "DUTY's GUI dependency is missing. Run python src/main.py setup with an installed Python 3.11, "
-        "then local/runtime/python/python.exe src/gui.py."
+        "DUTY's bundled GUI dependency is missing. Restore the complete DUTY download, "
+        "then open DUTY.exe."
     )
 
 from src.core import (
@@ -154,7 +154,7 @@ class Window(QMainWindow):
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
         result_layout.addWidget(self.progress)
-        self.message = QLabel("Checking your setup…")
+        self.message = QLabel("Checking your tools…")
         self.message.setWordWrap(True)
         self.message.setTextInteractionFlags(Qt.TextSelectableByMouse)
         result_layout.addWidget(self.message)
@@ -387,7 +387,7 @@ class Window(QMainWindow):
         self.cancel_button.setEnabled(True)
         self.progress.setRange(0, 0)
         self.message.setText(
-            "Checking setup…" if action == "check"
+            "Checking tools…" if action == "check"
             else "Refreshing login…" if action == "login"
             else f"Starting {action}…"
         )
@@ -441,7 +441,7 @@ class Window(QMainWindow):
             elif self.convert_ready:
                 message = "Convert is ready. Other tools need attention; see the status below."
             else:
-                message = "Setup needs attention. See the status below; run setup for missing components."
+                message = "Bundled tools need attention. See the status below; restore missing components from a complete DUTY download."
             self.message.setText(message)
         else:
             outcome = result.get("status", "failed")

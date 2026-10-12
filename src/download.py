@@ -110,7 +110,7 @@ def provider_options(config):
     for path in (config.tool("deno"), root / "plugin/yt_dlp_plugins/extractor/getpot_bgutil_script.py",
                  config.path("provider/server/src/generate_once.ts"), config.path("provider/server/node_modules")):
         if not path.exists():
-            raise FileNotFoundError(f"Missing provider dependency: {path}. Run python src/main.py setup.")
+            raise FileNotFoundError(f"Missing provider dependency: {path}. Restore the complete DUTY download.")
     plugin = str(root / "plugin")
     if plugin not in sys.path:
         sys.path.insert(0, plugin)
@@ -233,7 +233,7 @@ def convert_video(source: str | Path, *, overwrite: bool = False, config=None) -
             raise ValueError("Input must be an MP4 file")
         for name in ("ffmpeg", "ffprobe"):
             if not config.tool(name).is_file():
-                raise FileNotFoundError(f"Missing {name}: run python src/main.py setup")
+                raise FileNotFoundError(f"Missing {name}: restore the complete DUTY download")
         if output.exists():
             if not output.is_file():
                 raise ValueError(f"Output path is not a file: {output}")

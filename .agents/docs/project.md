@@ -3,8 +3,8 @@
 ## Architecture
 
 Six modules own the application. `main.py` dispatches Python commands with lazy
-imports so setup works before dependencies exist. `gui.py` is a PySide6 window
-with one worker at a time. `core.py` owns settings, paths, setup, locking, status,
+imports, including the offline bundle check. `gui.py` is a PySide6 window
+with one worker at a time. `core.py` owns settings, paths, bundled tools, locking, status,
 results and history. `session.py` combines the existing Firefox and authentication
 code. `download.py` and `upload.py` retain the existing transfer implementations.
 
@@ -14,55 +14,52 @@ Both frontends call the same helpers; neither frontend performs a separate uploa
 workflow. Namespace-package imports work from the repository root; there are no
 root-level Python wrappers or CMD launchers.
 
-## Setup and dependencies
+## Bundled dependencies
 
-A fresh Git clone needs external Windows x64 Python 3.11+ with pip to run
-`python src/main.py setup`. Setup uses the pinned URLs/checksums in
-`vendor/runtime-sources.json`; Python package versions are in `requirements.txt`
-without hashes. PySide6 is an added GUI dependency. Do not silently upgrade tools.
+The repository includes portable CPython 3.11.9 Windows x64 and its pinned
+libraries, Firefox, GeckoDriver, Deno, FFmpeg/ffprobe and the installed provider.
+Normal users need no system Python, pip, Node, installer or setup command.
+The six Python modules and `requirements.txt` remain the source and dependency
+pin references; do not silently upgrade components or enable yt-dlp default extras.
 
-Setup installs missing components in staging folders beneath `local/cache/setup/`
-and promotes them into `local/runtime/`. Existing executable components are reused.
-Incomplete destinations are reported rather than overwritten. Failed staging
-files remain available for diagnosis. Portable CPython 3.11.9 Windows x64 is
-downloaded first and stays excluded from Git with all other local tools.
-External pip uses `--python` to run dependency installation through the portable
-interpreter, evaluating wheel compatibility and dependency markers under 3.11.9.
-This needs pip 22.3+ with Python 3.11 support; do not silently upgrade external pip
-or add pip to portable Python. Install the complete requirements when packages
-are missing, keeping every pin and using wheels only. Do not enable extra groups
-such as yt-dlp's default extra, which conflicts with the existing urllib3 pin.
-Packages are installed in the portable interpreter's local site-packages.
-The portable interpreter deliberately does not need a system Python after setup.
-Setup directs users to the repository's root `DUTY.exe` launcher. It does not
-create shortcuts or compile the launcher during installation.
+Tools and Python site-packages stay at their existing `local/runtime/` paths.
+Provider source and upstream locks remain in `vendor/bgutil/`; the installed
+runtime copy and native dependencies are in `local/provider/server/`.
+Narrow ignore exceptions include these public dependency folders; all other
+local data, bytecode and the unused ffplay executable remain ignored.
+Unused installed Python console wrappers are also excluded: they reference
+the original external installer interpreter and are not used by DUTY.
 
-Provider source and upstream locks remain in `vendor/bgutil/`. A runtime copy of
-the TypeScript server and its native dependencies lives in `local/provider/server/`.
-Setup uses project-local Node/npm to install this copy; normal downloads use Deno.
-Caches, npm downloads and staging data remain beneath `local/`.
+`vendor/bundle-manifest.json` records file sizes, SHA-256 checksums, package pins
+and source provenance. It excludes itself and credentials. The internal
+`status --check` verifies file presence/sizes, package metadata and interpreter
+identity locally without network, provider execution, login, migration or a lock.
+It accepts bundled python.exe/pythonw.exe and checks no saved account state.
+Checksums are for source review; startup does not hash the whole installation.
 
-There is no packaging command or hosted service. A source clone excludes tools and
-credentials. Moving an existing whole installation retains them; sharing one
-signed-in installation would also share its account and must be avoided.
+`vendor/deno-cache/npm/` contains reviewed public npm metadata only. Initialization
+copies missing seed files to ignored `local/cache/deno/npm/`, keeping existing
+cache files. A local manifest fingerprint avoids repeat copying. No provider
+session/token cache, compiled code cache or installation archive is published.
+All generated data stays under ignored local folders.
+
+Bundled binaries use Git LFS. Clones require Git LFS and `git lfs pull` when
+objects are missing. The owner must enable GitHub's **Include Git LFS objects in
+archives** setting for working Download ZIP archives; LFS quotas apply.
+Before committing/pushing this bundle, the owner runs `git lfs install` inside
+the repository to install the LFS upload hook. File rules alone do not install it.
+Do not stage, commit, push or configure the user's Git automatically.
+Preserve third-party notices and source provenance; the bundle is not MIT-only.
 
 ## Desktop launcher
 
-`src/launcher.cs` is a small .NET Framework Windows GUI launcher, separate from
-the six Python modules. Root `DUTY.exe` embeds `img/logo.ico`, finds its own
-directory, and starts local pythonw with the quoted GUI path and that directory
-as its working directory. It uses no command shell, stored personal paths or
-script associations. Missing files and process-start errors use message boxes.
-It exits after starting Python; normal users do not need a compiler.
-
-Before starting the GUI, the launcher runs the hidden `setup --check` with local
-Python. This check is offline and ignores login. If local Python is missing or the
-check fails, it finds an external Windows x64 Python 3.11+ with pip 22.3+ through
-`py -0p` and PATH, skipping the portable interpreter. It then runs `setup
---launcher-progress` hidden inside a WinForms progress window, checks again and
-starts the GUI. Output is appended to `local/logs/launcher-setup.log`. Without a
-suitable interpreter or after a failure, the window shows the error and does not
-start the GUI.
+Root `DUTY.exe` is built from `src/launcher.cs`, embeds `img/logo.ico`, and resolves
+paths from its own directory. It checks for LFS placeholders in Python executables,
+runs hidden `local/runtime/python/python.exe src/main.py --json status --check`,
+then starts local pythonw.exe with the quoted GUI path and DUTY's root as cwd.
+It uses no command shell, external Python discovery, setup window or dependency
+downloads. Missing or incompatible files produce a graphical explanation directing
+the user to restore the complete download. The launcher exits after starting Python.
 
 To rebuild from the project root using the Windows .NET Framework compiler:
 
@@ -73,18 +70,14 @@ if ($LASTEXITCODE -ne 0) { throw 'Launcher build failed' }
 Copy-Item -LiteralPath local/cache/launcher-build/DUTY.exe -Destination DUTY.exe
 ```
 
-Keep build intermediates under ignored `local/`; include the final EXE and source
-in the repository. Do not add debug symbols, personal assembly metadata or
-machine-specific shortcuts. Root `DUTY.lnk` is ignored and no longer generated.
-Deleting the old shortcut does not remove it from earlier Git commits; publication
-history cleanup is a separate user-controlled action.
+Keep intermediates under ignored local/cache; publish the EXE and source without
+debug symbols, personal metadata or machine-specific shortcuts. DUTY.lnk is ignored.
+No runtime rebuild or ZIP build is required to prepare the current installed files.
 
-Execution validation is pending. Manual acceptance scenarios: double-click shows
-only the GUI; moving the folder (including spaces/non-ASCII characters) still
-works; missing setup files show a graphical explanation; background Deno, FFprobe
-and GeckoDriver windows remain suppressed. Do not run these checks without user
-authorization. Launcher compilation and static binary inspection are distinct
-from runtime rebuilds or distribution ZIP builds.
+Manual execution validation remains pending: a fresh complete download on a machine
+without Python, relocation with spaces/non-ASCII names, offline conversion,
+missing/LFS-pointer files and reuse of saved account state. Source review and one
+launcher compilation do not establish that these scenarios have passed.
 
 ## Session and operation invariants
 
@@ -102,8 +95,8 @@ profiles. Cleanup runs on failure/cancellation too. Cookie-copy protection preve
 local overwrites; it cannot prevent server-side expiry or rotation.
 
 The shared operation context provides a process/thread lock and restores temporary
-environment settings on exit. It uses a standard-library file lock even before
-dependencies are installed. GUI worker events report progress without touching
+environment settings on exit. It uses a standard-library file lock without
+third-party lock dependencies. GUI worker events report progress without touching
 widgets off the UI thread. Cancellation is cooperative and may wait for the
 current browser/network operation or FFmpeg processing to return.
 
@@ -148,7 +141,7 @@ Old root runtime/permanent/work/downloads/history/logs/cache/dist folders move
 under `local/`; provider node_modules move to the local server. No executable
 rebuild is needed. Migration preflights conflicting destinations, moves complete
 directories and can resume after interruption. It never merges conflicting state.
-The embedded Python import path follows the new location.
+The bundled Python import path is already relative; migration does not rewrite bundled files.
 
 Only application-owned `local_path` history fields beneath the old downloads/work
 directories are relocated. Fingerprints, channel identity and cookie generations
